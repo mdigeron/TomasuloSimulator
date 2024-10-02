@@ -5,7 +5,7 @@
 # NEED TO ADD MORE DATA STRUCTURES, linked list connections for registers?
 # write output to a file to 
 class Instruction: # add cycle amount? when use issue exec and write?
-    def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=None, execute_start_cycle=None, execute_end_cycle=None, write_back_cycle=None): # possibly refactor into breaking up after passing i.e. instruction[0]...
+    def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=0, execute_start_cycle=0, execute_end_cycle=0, write_back_cycle=0): # possibly refactor into breaking up after passing i.e. instruction[0]...
         self.opcode = opcode
         self.destination = destination
         self.operand1 = operand1
@@ -15,7 +15,6 @@ class Instruction: # add cycle amount? when use issue exec and write?
         self.execute_start_cycle = execute_start_cycle
         self.execute_end_cycle = execute_end_cycle
         self.write_back_cycle = write_back_cycle
-        self.functional_unit = functional_unit
 
     def __str__(self):
         return (f"{self.opcode} {self.destination.get_name()} {self.operand1.get_name()} {self.operand2.get_name()} | Cycle Issued: {self.issued_cycle} | Cycle Start Execute: {self.execute_start_cycle} | Cycle End Execute: {self.execute_end_cycle} | Cycle Write Back: {self.write_back_cycle}")
@@ -34,16 +33,16 @@ class Instruction: # add cycle amount? when use issue exec and write?
 
     def get_issued_cycle(self):
         return self.issued_cycle
-
+        
     def get_execute_start_cycle(self):
         return self.execute_start_cycle
-
+        
     def get_execute_end_cycle(self):
         return self.execute_end_cycle
-
+        
     def get_write_back_cycle(self):
         return self.write_back_cycle
-    
+        
     def set_issued_cycle(self, clock_cycle):
         self.issued_cycle = clock_cycle
 
@@ -60,10 +59,11 @@ class Instruction: # add cycle amount? when use issue exec and write?
 
 class InstructionQueue: 
     def __init__(self):
-        self.head = None
+        self.head = None 
         self.tail = None
         self.length = 0
-
+        self.pseudo_head = None
+        
     def enqueue(self, opcode, destination, operand1, operand2):
         new_instruction = Instruction(opcode, destination, operand1, operand2)
         if self.tail is not None:
@@ -71,12 +71,13 @@ class InstructionQueue:
         self.tail = new_instruction
         if self.head is None:
             self.head = new_instruction
+            self.pseudo_head = new_instruction
         self.length += 1
 
     def is_empty(self):
         return self.length == 0
 
-    def dequeue(self): # possibly make the dequeue process not result in removing the instruction, just move a seperate pointer so we can access the instruction information such as when it was executed, written etc
+    def dequeue(self): # possibly make the dequeue process not result in removing the instruction, just move a seperate pointer so we can access the instruction information such as when it was executed, written etc (soft_dequeue?)
         if self.is_empty():
             return "Instruction queue is empty"
         instruction = self.head
@@ -86,9 +87,18 @@ class InstructionQueue:
         self.length -= 1
         return instruction
 
+    def soft_dequeue(self): 
+        if self.is_empty():
+            return "Instruction queue is empty"
+        instruction = self.pseudo_head
+        self.pseudo_head = instruction.next
+        self.length -= 1 # length also needs to be controlled by soft_dequeue to mimic dequeue even though its not accurate
+        return instruction
+
     def get_length(self):
         return self.length
 
+    
     def __str__(self):
         instructions = "" # refactor to do without list like in hw2
         current = self.head
@@ -101,12 +111,13 @@ class InstructionQueue:
             instruction.append(current.operand2.get_name())
             instructions.append(instruction)
             """
-            instructions += current.opcode + " | " + current.destination.get_name() + " | " + current.operand1.get_name() + " | " + current.operand2.get_name() + "\n"
+            #instructions += current.opcode + " | " + current.destination.get_name() + " | " + current.operand1.get_name() + " | " + current.operand2.get_name() + " | " + str(current.get_issued_cycle()) + " | " + str(current.get_execute_start_cycle()) + " | " + str(current.get_execute_end_cycle()) + " | " + str(current.get_write_back_cycle()) + "\n"
+            instructions += str(current) + "\n"
             current = current.next
         return instructions
 
 class ReservationStation:
-    def __init__(self, name, time=None, op=None, vj=None, vk=None, qj=None, qk=None, busy=False):
+    def __init__(self, name, time=None, op=None, vj=None, vk=None, qj=None, qk=None, busy=False, instruction_pointer=None):
         self.name = name
         self.time = time
         self.op = op
@@ -115,8 +126,9 @@ class ReservationStation:
         self.qj = qj
         self.qk = qk
         self.busy = busy
-        self.busty_cycles = 0
-        self.executing_cycles = 0
+        self.busty_cycles = 0 # update while waiting/executing
+        self.executing_cycles = 0 # only update while executing
+        self.instruction_pointer = instruction_pointer # points to instruction in order to modify its start/end execution cycle and write back cycle
 
     def get_time(self):
         return self.time
@@ -144,6 +156,9 @@ class ReservationStation:
 
     def get_qk(self):
         return self.qk
+
+    def get_instruction_pointer(self):
+        return self.instruction_pointer
     
     def set_op(self, op):
         self.op = op
@@ -166,12 +181,15 @@ class ReservationStation:
     def set_busy_status(self, status):
         self.busy = status
 
+    def set_instruction_pointer(self, instruction):
+        self.instruction_pointer = instruction
+
     def __str__(self):
         return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Vj: {self.vj.get_name()  if self.vj != None else None} | Vk: {self.vk.get_name() if self.vk != None else None} | Qj: {self.qj.get_name() if self.qj != None else None} | Qk: {self.qk.get_name() if self.qk != None else None}")
         # NEED TO HANDLE AttributeError: 'NoneType' object has no attribute 'get_name'
 
-class LoadBuffer: 
-    def __init__(self, name, time=None, address=None, busy=False):
+class LoadBuffer: # need to verify loads work as indended
+    def __init__(self, name, time=None, address=None, busy=False, instruction_pointer= None):
         self.name = name
         self.address = address
         self.busy = busy
@@ -191,6 +209,9 @@ class LoadBuffer:
     def get_time(self):
         return self.time
 
+    def get_instruction_pointer(self):
+        return self.instruction_pointer
+
     def set_time(self, time):
         self.time = time
 
@@ -199,6 +220,9 @@ class LoadBuffer:
 
     def set_busy_status(self, status):
         self.busy = status
+
+    def set_instruction_pointer(self, instruction):
+        self.instruction_pointer = instruction
 
     def __str__(self):
         return (f"Name: {self.name} | Busy: {self.busy} | Address: {self.address}")
@@ -307,8 +331,10 @@ class Tomasulo:
                         rs.set_vk(operand2)
                         self.registers[operand2.get_name()].set_buffer(rs)
                     rs.set_busy_status(True)
+                    rs.set_instruction_pointer(instruction)
+                    rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     issued = True
-                    instruction.set_issued_cylce(self.clock_cycle)
+                    #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
         elif opcode == "MULTD" or opcode == "DIVD":
             for rs in self.fp_multipliers.values():
@@ -327,8 +353,10 @@ class Tomasulo:
                         rs.set_vk(operand2)
                         self.registers[operand2.get_name()].set_buffer(rs)
                     rs.set_busy_status(True)
+                    rs.set_instruction_pointer(instruction)
+                    rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     issued = True
-                    instruction.set_issued_cylce(self.clock_cycle)
+                    #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
         else: # opcode == "LDDD"
             for lb in self.loadbuffers.values():
@@ -340,7 +368,9 @@ class Tomasulo:
                         self.registers[operand2].set_buffer(lb)
                     lb.set_busy_status(True)
                     issued = True
-                    instruction.set_issued_cylce(self.clock_cycle)
+                    lb.set_instruction_pointer(instruction)
+                    lb.instruction_pointer.set_issued_cycle(self.clock_cycle)
+                    #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
         if issued == False:
             print("No avalible Function Units this  clock cycle for Instruction: ", instruction)
@@ -351,7 +381,11 @@ class Tomasulo:
     def execute_instructions(self): # NEED TO MOVE LOGIC TO EXECUTE INSTRUCTION SO AFTER INSTRUCTION QUEUE IS EMPTY EXECUTION CONTINUES/move q to v when ready
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None:
+                if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                    rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
                 rs.set_time(rs.get_time()- 1)
+                if rs.get_time() == 0:
+                    rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
                 # comment lines for testing
             if rs.get_busy_status() == True and rs.get_qj() != None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
@@ -369,7 +403,11 @@ class Tomasulo:
                 # comment lines for testing
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None:
+                if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                    rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
                 rs.set_time(rs.get_time()- 1)
+                if rs.get_time() == 0:
+                    rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
             if rs.get_busy_status() == True and rs.get_qj() != None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
                     rs.set_vj(rs.get_qj())
@@ -403,6 +441,8 @@ class Tomasulo:
                 rs.set_qj(None)
                 rs.set_qk(None)
                 rs.set_busy_status(False)
+                rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
+                rs.set_instruction_pointer(None)
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_time() == 0:
                 self.registers[rs.get_vj().get_name()].set_buffer(None) 
@@ -414,11 +454,14 @@ class Tomasulo:
                 rs.set_qj(None)
                 rs.set_qk(None)
                 rs.set_busy_status(False)
+                rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
+                rs.set_instruction_pointer(None)
         for lb in self.loadbuffers.values():
             if lb.get_busy_status() == True and lb.get_time() == 0:
                 lb.set_time(None)
                 lb.set_address(None)
                 lb.set_busy_status(False)
+                lb.set_instruction_pointer(None)
         self.check_register_buffers()
 
     def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
@@ -441,12 +484,12 @@ class Tomasulo:
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
         for lb in self.loadbuffers.values():
-            """
+            #"""
             if lb.get_busy_status() == True and lb.get_time() == 0:
                 lb.set_time(None)
                 lb.set_address(None)
                 lb.set_busy_status(False)
-            """
+            #"""
             pass
 
     def empty_reservation_stations(self):
@@ -465,7 +508,7 @@ class Tomasulo:
         while self.instruction_queue.is_empty() != True:
             # need to add logic for case of instruction not being able to be issued because everything is full
             print("\n")
-            instruction = self.instruction_queue.dequeue()
+            instruction = self.instruction_queue.soft_dequeue()
             issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
             if issued == False:
                 while issued == False:
@@ -486,7 +529,9 @@ class Tomasulo:
             self.execute_instructions()
             #self.write_back()
             self.increment_clock_cycle()
-            self.display_simulation()  
+            self.display_simulation()
+        print("\nRESULTS TABLE\n")
+        print(self.instruction_queue)
 
     def display_simulation(self):
         # possibly the table format to display the simulation like on the slides use previously made helper functions to display
@@ -543,6 +588,8 @@ def generate_registers(num_registers):
 
 # go back and add utilization so it can be used later for graphing
 # also update new information for the instructions
+
+# output each clock cycle contents into a data structure to be able to print out any given clock cycle
 
 # TEST CODE
 random.seed(1)
