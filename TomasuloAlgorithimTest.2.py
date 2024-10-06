@@ -15,6 +15,7 @@ class Instruction: # add cycle amount? when use issue exec and write?
         self.execute_start_cycle = execute_start_cycle
         self.execute_end_cycle = execute_end_cycle
         self.write_back_cycle = write_back_cycle
+        self.issue_delay = True # stall a cycle to prevent executing same cycle as issue
 
     def __str__(self):
         return (f"{self.opcode} {self.destination.get_name()} {self.operand1.get_name()} {self.operand2.get_name()} | Cycle Issued: {self.issued_cycle} | Cycle Start Execute: {self.execute_start_cycle} | Cycle End Execute: {self.execute_end_cycle} | Cycle Write Back: {self.write_back_cycle}")
@@ -54,6 +55,9 @@ class Instruction: # add cycle amount? when use issue exec and write?
 
     def set_write_back_cycle(self, clock_cycle):
         self.write_back_cycle = clock_cycle
+
+    def set_issue_delay(self, boolean):
+        self.issue_delay = boolean
 
 
 
@@ -117,7 +121,7 @@ class InstructionQueue:
         return instructions
 
 class ReservationStation:
-    def __init__(self, name, time=None, op=None, vj=None, vk=None, qj=None, qk=None, busy=False, instruction_pointer=None):
+    def __init__(self, name, time=None, op=None, vj=None, vk=None, qj=None, qk=None, busy=False, source=None, instruction_pointer=None):
         self.name = name
         self.time = time
         self.op = op
@@ -125,9 +129,13 @@ class ReservationStation:
         self.vk = vk
         self.qj = qj
         self.qk = qk
+        self.source = source
+        self.source_buffer = None
         self.busy = busy
-        self.busty_cycles = 0 # update while waiting/executing
+        self.busy_cycles = 0 # update while waiting/executing
         self.executing_cycles = 0 # only update while executing
+        self.busy_fraction = 0
+        self.executing_fraction = 0
         self.instruction_pointer = instruction_pointer # points to instruction in order to modify its start/end execution cycle and write back cycle
 
     def get_time(self):
@@ -157,6 +165,12 @@ class ReservationStation:
     def get_qk(self):
         return self.qk
 
+    def get_source(self):
+        return self.source
+
+    def get_source_buffer(self):
+        return self.source_buffer
+
     def get_instruction_pointer(self):
         return self.instruction_pointer
     
@@ -175,6 +189,12 @@ class ReservationStation:
     def set_qk(self, qk):
         self.qk = qk
 
+    def set_source(self, source):
+        self.source = source
+
+    def set_source_buffer(self, source):
+        self.source_buffer = source
+
     def is_ready(self):
         return self.time == 0
 
@@ -189,13 +209,21 @@ class ReservationStation:
         # NEED TO HANDLE AttributeError: 'NoneType' object has no attribute 'get_name'
 
 class LoadBuffer: # need to verify loads work as indended
-    def __init__(self, name, time=None, address=None, busy=False, instruction_pointer= None):
+    def __init__(self, name, time=None, vj=None, qj=None, address=None, busy=False, instruction_pointer=None):
         self.name = name
         self.address = address
+        self.op = "LDDD" # add store instruction as well STRD
+        self.source = None
+        self.source_buffer = None
         self.busy = busy
         self.time = time
-        self.busty_cycles = 0
+        self.vj = vj
+        self.qj = qj
+        self.busy_cycles = 0
         self.executing_cycles = 0
+        self.busy_fraction = 0
+        self.executing_fraction = 0
+        self.instruction_pointer = instruction_pointer # points to instruction in order to modify its start/end execution cycle and write back cycle
 
     def get_name(self):
         return self.name
@@ -206,8 +234,24 @@ class LoadBuffer: # need to verify loads work as indended
     def get_address(self):
         return self.address
 
+
+    def get_op(self):
+        return self.op
+
     def get_time(self):
         return self.time
+
+    def get_vj(self):
+        return self.vj
+
+    def get_qj(self):
+        return self.qj
+
+    def get_source(self):
+        return self.source
+
+    def get_source_buffer(self):
+        return self.source_buffer
 
     def get_instruction_pointer(self):
         return self.instruction_pointer
@@ -216,23 +260,36 @@ class LoadBuffer: # need to verify loads work as indended
         self.time = time
 
     def set_address(self, address):
-        self.address == address
+        self.address = address
+
+    def set_vj(self, vj):
+        self.vj = vj
+
+    def set_qj(self, qj):
+        self.qj = qj
 
     def set_busy_status(self, status):
         self.busy = status
+
+    def set_source(self, source):
+        self.source = source
+
+    def set_source_buffer(self, source):
+        self.source_buffer = source
 
     def set_instruction_pointer(self, instruction):
         self.instruction_pointer = instruction
 
     def __str__(self):
-        return (f"Name: {self.name} | Busy: {self.busy} | Address: {self.address}")
+        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Address: {self.address}")
         
 
 class Register:
     def __init__(self, name, value=None, buffer=None):
         self.name = name
         self.value = value
-        self.buffer = buffer # should be a reservation station
+        self.buffer = buffer # should be a reservation station/ load buffer
+        self.write_back = True
 
     def get_name(self):
         return self.name
@@ -243,11 +300,17 @@ class Register:
     def get_buffer(self):
         return self.buffer
 
+    def get_write_back(self):
+        return self.write_back
+
     def set_value(self, value):
         self.value = value
 
     def set_buffer(self, buffer):
         self.buffer = buffer
+
+    def set_write_back(self, boolean):
+        self.write_back = boolean
 
     def __str__(self):
         return(f"Register: {self.name} | Value: {self.value} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
@@ -291,19 +354,20 @@ class Tomasulo:
 
     def display_adders(self): # make formatting look better
         for name, rs in self.fp_adders.items():
-            print("Reservation Station: " + name + " ", rs)
+            print("Reservation Station: " + name + " ", rs,  " Busy Utilization: " + str(rs.busy_fraction) + " | Execution Utilization: " + str(rs.executing_fraction))
 
     def display_multipliers(self):
         for name, rs in self.fp_multipliers.items():
-            print("Reservation Station: " + name + " ", rs)
+            print("Reservation Station: " + name + " ", rs, " Busy Utilization: " + str(rs.busy_fraction) + " | Execution Utilization: " + str(rs.executing_fraction))
 
     def display_loadbuffers(self):
         for name, lb in self.loadbuffers.items():
-            print("Load Buffer: " + name + " ", lb)
+            print("Load Buffer: " + name + " ", lb, " Busy Utilization: " + str(lb.busy_fraction) + " | Execution Utilization: " + str(lb.executing_fraction))
 
     def display_registers(self):
         for register in self.registers.values():
             print(register)
+
 
     def issue_instruction(self, instruction):
         issued = False
@@ -330,6 +394,11 @@ class Tomasulo:
                     else:
                         rs.set_vk(operand2)
                         self.registers[operand2.get_name()].set_buffer(rs)
+                    if destination.get_buffer() != None:
+                        rs.set_source_buffer(destination)
+                    else:
+                        rs.set_source(destination)
+                        self.registers[destination.get_name()].set_buffer(rs)
                     rs.set_busy_status(True)
                     rs.set_instruction_pointer(instruction)
                     rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
@@ -352,6 +421,11 @@ class Tomasulo:
                     else:
                         rs.set_vk(operand2)
                         self.registers[operand2.get_name()].set_buffer(rs)
+                    if destination.get_buffer() != None:
+                        rs.set_source_buffer(destination)
+                    else:
+                        rs.set_source(destination)
+                        self.registers[destination.get_name()].set_buffer(rs)
                     rs.set_busy_status(True)
                     rs.set_instruction_pointer(instruction)
                     rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
@@ -363,9 +437,17 @@ class Tomasulo:
                 if lb.get_busy_status() == False and issued == False:
                     print("Avaliable Load Buffer " + lb.get_name())
                     lb.set_time(self.instruction_latency["LDDD"])
-                    if operand2.get_buffer() == None:
-                        lb.set_address(str(operand1) + " " + operand2.get_name()) # check data types
-                        self.registers[operand2].set_buffer(lb)
+                    lb.set_address(str(operand1) + " " + operand2.get_name()) # check data types
+                    if operand2.get_buffer() != None:
+                        lb.set_qj(operand2)
+                    else:
+                        lb.set_vj(operand2)
+                        self.registers[operand2.get_name()].set_buffer(lb)
+                    if destination.get_buffer() != None:
+                        lb.set_source_buffer(destination)
+                    else:
+                        lb.set_source(destination)
+                        self.registers[destination.get_name()].set_buffer(lb)
                     lb.set_busy_status(True)
                     issued = True
                     lb.set_instruction_pointer(instruction)
@@ -380,12 +462,23 @@ class Tomasulo:
 
     def execute_instructions(self): # NEED TO MOVE LOGIC TO EXECUTE INSTRUCTION SO AFTER INSTRUCTION QUEUE IS EMPTY EXECUTION CONTINUES/move q to v when ready
         for rs in self.fp_adders.values():
-            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None:
-                if rs.get_time() == self.instruction_latency[rs.get_op()]:
-                    rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
-                rs.set_time(rs.get_time()- 1)
-                if rs.get_time() == 0:
-                    rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
+                if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
+                    if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                        rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    # INFINITE LOOP DETECTED MUST FIX
+                    rs.set_time(rs.get_time()- 1)
+                    rs.executing_cycles += 1
+                    if rs.get_time() == 0:
+                        rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:  
+                    rs.instruction_pointer.set_issue_delay(False)
+                    if rs.get_vk().get_write_back() == False:
+                        rs.get_vk().set_write_back(True)
+                    if rs.get_vj().get_write_back() == False:
+                        rs.get_vj().set_write_back(True)
+                    if rs.get_source().get_write_back() == False:
+                        rs.get_source().set_write_back(True)
                 # comment lines for testing
             if rs.get_busy_status() == True and rs.get_qj() != None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
@@ -394,25 +487,47 @@ class Tomasulo:
                     rs.set_vj(rs.get_qj())
                     self.registers[rs.get_vj().get_name()].set_buffer(rs)
                     rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
             if rs.get_busy_status() == True and rs.get_qk() != None:
                 if self.registers[rs.get_qk().get_name()].get_buffer() == None:
                     #rs.set_vk(rs.get_qk().get_name())
                     rs.set_vk(rs.get_qk())
                     self.registers[rs.get_vk().get_name()].set_buffer(rs)
                     rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_source_buffer() != None:
+                if self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                    # source and source buffer
+                    rs.set_source(rs.get_source_buffer())
+                    self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                    rs.set_source_buffer(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True:
+                rs.busy_cycles += 1
                 # comment lines for testing
         for rs in self.fp_multipliers.values():
-            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None:
-                if rs.get_time() == self.instruction_latency[rs.get_op()]:
-                    rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
-                rs.set_time(rs.get_time()- 1)
-                if rs.get_time() == 0:
-                    rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
+                if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
+                    if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                        rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    rs.set_time(rs.get_time()- 1)
+                    rs.executing_cycles += 1
+                    if rs.get_time() == 0:
+                        rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:
+                    rs.instruction_pointer.set_issue_delay(False)
+                    if rs.get_vk().get_write_back() == False:
+                        rs.get_vk().set_write_back(True)
+                    if rs.get_vj().get_write_back() == False:
+                        rs.get_vj().set_write_back(True)
+                    if rs.get_source().get_write_back() == False:
+                        rs.get_source().set_write_back(True)
             if rs.get_busy_status() == True and rs.get_qj() != None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
                     rs.set_vj(rs.get_qj())
                     self.registers[rs.get_vj().get_name()].set_buffer(rs)
                     rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
             if rs.get_busy_status() == True and rs.get_qk() != None:
                 if self.registers[rs.get_qk().get_name()].get_buffer() == None:
                     rs.set_vk(rs.get_qk())
@@ -424,9 +539,47 @@ class Tomasulo:
                     """
                     self.registers[rs.get_vk().get_name()].set_buffer(rs)
                     rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_source_buffer() != None:
+                if self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                    # source and source buffer
+                    rs.set_source(rs.get_source_buffer())
+                    self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                    rs.set_source_buffer(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True:
+                    rs.busy_cycles += 1
         for lb in self.loadbuffers.values():
+            if lb.get_busy_status() == True and lb.get_qj() == None and lb.get_source_buffer() == None:
+                if lb.instruction_pointer.issue_delay == False and lb.get_vj().get_write_back() == True and lb.get_source().get_write_back() == True: # NOT GETTING IN HERE
+                    if lb.get_time() == self.instruction_latency[lb.get_op()]:
+                        lb.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    lb.set_time(lb.get_time()- 1)
+                    lb.executing_cycles += 1
+                    if lb.get_time() == 0:
+                        lb.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:
+                    lb.instruction_pointer.set_issue_delay(False)
+                    if lb.get_vj().get_write_back() == False:
+                        lb.get_vj().set_write_back(True)
+                    if lb.get_source().get_write_back() == False:
+                        lb.get_source().set_write_back(True)
+            if lb.get_busy_status() == True and lb.get_qj() != None:
+                print("QJ ", self.registers[lb.get_qj().get_name()].get_buffer())
+                if self.registers[lb.get_qj().get_name()].get_buffer() == None:
+                    lb.set_vj(lb.get_qj())
+                    self.registers[lb.get_vj().get_name()].set_buffer(lb)
+                    lb.set_qj(None)
+                lb.instruction_pointer.set_issue_delay(False)
+            if lb.get_busy_status() == True and lb.get_source_buffer() != None:
+                if self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
+                    # source and source buffer
+                    lb.set_source(lb.get_source_buffer())
+                    self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
+                    lb.set_source_buffer(None)
+                lb.instruction_pointer.set_issue_delay(False)
             if lb.get_busy_status() == True:
-                lb.set_time(lb.get_time()- 1)
+                lb.busy_cycles += 1
      
 
     def write_back(self): # infinite loop caused because instruction is issued before qj/qk given to what needs it so make a check here to send it backon clock cycle 87
@@ -434,12 +587,18 @@ class Tomasulo:
             if rs.get_busy_status() == True and rs.get_time() == 0:
                 self.registers[rs.get_vj().get_name()].set_buffer(None) # check logic here to make sure registers is freed so it can be used next instruction cycle in issue instruction/execute
                 self.registers[rs.get_vk().get_name()].set_buffer(None)
+                self.registers[rs.get_source().get_name()].set_buffer(None)
+                rs.get_vk().set_write_back(False)
+                rs.get_vj().set_write_back(False)
+                rs.get_source().set_write_back(False)
                 rs.set_time(None)
                 rs.set_op(None)
                 rs.set_vj(None)
                 rs.set_vk(None)
                 rs.set_qj(None)
                 rs.set_qk(None)
+                rs.set_source(None)
+                rs.set_source_buffer(None)
                 rs.set_busy_status(False)
                 rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 rs.set_instruction_pointer(None)
@@ -447,20 +606,35 @@ class Tomasulo:
             if rs.get_busy_status() == True and rs.get_time() == 0:
                 self.registers[rs.get_vj().get_name()].set_buffer(None) 
                 self.registers[rs.get_vk().get_name()].set_buffer(None)
+                self.registers[rs.get_source().get_name()].set_buffer(None)
+                rs.get_vk().set_write_back(False)
+                rs.get_vj().set_write_back(False)
+                rs.get_source().set_write_back(False)
                 rs.set_time(None)
                 rs.set_op(None)
                 rs.set_vj(None)
                 rs.set_vk(None)
                 rs.set_qj(None)
                 rs.set_qk(None)
+                rs.set_source(None)
+                rs.set_source_buffer(None)
                 rs.set_busy_status(False)
                 rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 rs.set_instruction_pointer(None)
         for lb in self.loadbuffers.values():
-            if lb.get_busy_status() == True and lb.get_time() == 0:
+            if lb.get_busy_status() == True and lb.get_time() == 0: # lb is only set to false here 
+                self.registers[lb.get_vj().get_name()].set_buffer(None)
+                self.registers[lb.get_source().get_name()].set_buffer(None)
+                lb.get_vj().set_write_back(False)
+                lb.get_source().set_write_back(False)
                 lb.set_time(None)
                 lb.set_address(None)
+                lb.set_vj(None)
+                lb.set_qj(None)
                 lb.set_busy_status(False)
+                lb.set_source(None)
+                lb.set_source_buffer(None)
+                lb.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 lb.set_instruction_pointer(None)
         self.check_register_buffers()
 
@@ -470,27 +644,46 @@ class Tomasulo:
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
+                #rs.get_vj().set_write_back(False)
             elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
+                #rs.get_vk().set_write_back(False)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
+                #rs.get_vj().set_write_back(False)
             elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
+                #rs.get_vk().set_write_back(False)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
         for lb in self.loadbuffers.values():
-            #"""
+            """
             if lb.get_busy_status() == True and lb.get_time() == 0:
                 lb.set_time(None)
                 lb.set_address(None)
                 lb.set_busy_status(False)
-            #"""
-            pass
+            """
+            if lb.get_busy_status() == True and lb.get_qj() != None and self.registers[lb.get_qj().get_name()].get_buffer() == None:
+                lb.set_vj(lb.get_qj())
+                self.registers[lb.get_qj().get_name()].set_buffer(lb)
+                lb.set_qj(None)
+            elif lb.get_busy_status() == True and lb.get_source_buffer() != None and self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
+                lb.set_source(lb.get_source_buffer())
+                self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
+                lb.set_source_buffer(None)
 
     def empty_reservation_stations(self):
         for rs in self.fp_adders.values():
@@ -503,6 +696,18 @@ class Tomasulo:
             if lb.get_busy_status() == True:
                 return False
         return True
+
+    def update_utilizations(self):
+        for rs in self.fp_adders.values():
+            rs.busy_fraction = rs.busy_cycles/self.clock_cycle
+            rs.executing_fraction = rs.executing_cycles/self.clock_cycle
+        for rs in self.fp_multipliers.values():
+            rs.busy_fraction = rs.busy_cycles/self.clock_cycle
+            rs.executing_fraction = rs.executing_cycles/self.clock_cycle
+        for lb in self.loadbuffers.values():
+            lb.busy_fraction = lb.busy_cycles/self.clock_cycle
+            lb.executing_fraction = lb.executing_cycles/self.clock_cycle
+    
 
     def run_algorithim(self): # add verbose mode to determine what is displayed
         while self.instruction_queue.is_empty() != True:
@@ -517,18 +722,21 @@ class Tomasulo:
                     self.execute_instructions()
                     #self.write_back()
                     self.increment_clock_cycle()
+                    self.update_utilizations()
                     self.display_simulation()
             else:
                 self.write_back()
                 self.execute_instructions()
                 #self.write_back()
                 self.increment_clock_cycle()
+                self.update_utilizations()
                 self.display_simulation()
         while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
             self.write_back()
             self.execute_instructions()
             #self.write_back()
             self.increment_clock_cycle()
+            self.update_utilizations()
             self.display_simulation()
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
@@ -588,7 +796,8 @@ def generate_registers(num_registers):
 
 # go back and add utilization so it can be used later for graphing
 # also update new information for the instructions
-
+# CANT START EXECUTING UNTIL 1 CYCLE AFTER WRITE BACK LOOK AT INSTRUCTION 2-3
+# ADD STORE INSTRUCTION TO BE USED WITH LOAD BUFFERS AS WELL
 # output each clock cycle contents into a data structure to be able to print out any given clock cycle
 
 # TEST CODE
@@ -598,3 +807,4 @@ queue = generate_instruction_queue(opcodes, registers, 11)
 print(queue)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes)
 tomasulo.run_algorithim()
+
