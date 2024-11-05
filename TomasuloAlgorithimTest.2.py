@@ -59,49 +59,138 @@ class Instruction: # add cycle amount? when use issue exec and write?
     def set_issue_delay(self, boolean):
         self.issue_delay = boolean
 
-
-
+############################################################################
+# Class: InstructionQueue
+#
+# This class creates and removes instructions through the enqueue/dequeue
+# operations specified in the InstructionQueue public interface.
+#
+# Underlying Implmentation:
+#   Singly Linked List
+#
+#   Note: The nodes are the instructions themselves,
+#         and each one holds a pointer to the next instruction.
+#
+# Private Data Members:
+#     Instruction * head - pointer to the first instruction in the queue.
+#                          head = None when the queue is empty.
+#
+#     Instruction * tail - pointer to the last instruction in the queue.
+#                          tail = None when the queue is empty.
+#
+#     int length - count of instructions currently in the queue.
+#                  length = 0 when the queue is empty.
+#
+#     Instruction * pseudo_head - represents the virtual start of the
+#                                 queue, so that previous instructions are
+#                                 still accessible for execution history.
+#
+# Public Interface/Methods:
+#
+# __init__, __str__, is_empty, get_length, enqueue, dequeue, soft_dequeue
+#
+############################################################################
 class InstructionQueue: 
     def __init__(self):
         self.head = None 
         self.tail = None
         self.length = 0
         self.pseudo_head = None
-        
-    def enqueue(self, opcode, destination, operand1, operand2):
-        new_instruction = Instruction(opcode, destination, operand1, operand2)
-        if self.tail is not None:
-            self.tail.next = new_instruction
-        self.tail = new_instruction
-        if self.head is None:
-            self.head = new_instruction
-            self.pseudo_head = new_instruction
-        self.length += 1
 
+    ###########################################################
+    # InstructionQueue State/Status Methods
+    #
+    # is_empty(self) - returns true if there are no active
+    #                  instructions avaiable for execution.
+    #
+    # get_length(self) - returns current number of active
+    #                    instructions in the queue
+    #                    that are avaiable for execution.
+    #
+    ###########################################################
     def is_empty(self):
         return self.length == 0
-
-    def dequeue(self): # possibly make the dequeue process not result in removing the instruction, just move a seperate pointer so we can access the instruction information such as when it was executed, written etc (soft_dequeue?)
-        if self.is_empty():
-            return "Instruction queue is empty"
-        instruction = self.head
-        self.head = self.head.next
-        if self.head is None:
-            self.tail = None
-        self.length -= 1
-        return instruction
-
-    def soft_dequeue(self): 
-        if self.is_empty():
-            return "Instruction queue is empty"
-        instruction = self.pseudo_head
-        self.pseudo_head = instruction.next
-        self.length -= 1 # length also needs to be controlled by soft_dequeue to mimic dequeue even though its not accurate
-        return instruction
 
     def get_length(self):
         return self.length
 
+    ###########################################################
+    #
+    # Method: enqueue
+    #
+    # Creates a new Instruction and inserts it at the end of
+    # the queue or at the head of the queue when the
+    # InstructionQueue is empty.
+    #
+    # Parameters:
+    #     InstructionQueue * self
+    #     string   opcode
+    #     Register destination
+    #     Register operand1
+    #     Register operand2
+    #
+    # Returns: Does not return anything.
+    #
+    ###########################################################
+    def enqueue(self, opcode, destination, operand1, operand2):
+        new_instruction = Instruction(opcode, destination, operand1, operand2)
+        
+        if self.tail is not None:
+            self.tail.next = new_instruction
+            
+        self.tail = new_instruction
+        
+        if self.head is None:
+            self.head = new_instruction
+            self.pseudo_head = new_instruction
+            
+        self.length += 1
+
+    # possibly make the dequeue process not result in removing
+    # the instruction, just move a seperate pointer so we can
+    # access the instruction information such as when it was
+    # executed, written etc (soft_dequeue?)
+    def dequeue(self): 
+        if self.is_empty():
+            return "Instruction queue is empty"
+        
+        instruction = self.head
+        self.head = self.head.next
+        
+        if self.head is None:
+            self.tail = None
+            
+        self.length -= 1
+        
+        return instruction
+
+    ###########################################################
+    #
+    # Method: soft_dequeue
+    #
+    # Performs a "soft" deletion of an instruction from the
+    # queue. A virtual head of the list is moved forward in the
+    # list on each call of `soft_dequeue`, and it points to the
+    # first instruction avaiable for execution in the queue.
+    # Instructions that still exist before the virtual list head
+    # are kept for historical information, and can only be
+    # removed by the `dequeue` operation.
+    #
+    # Parameters:
+    #     InstructionQueue * self
+    #
+    # Returns: Does not return anything.
+    #
+    ###########################################################
+    def soft_dequeue(self): 
+        if self.is_empty():
+            return "Instruction queue is empty"
+        
+        instruction = self.pseudo_head
+        self.pseudo_head = instruction.next
+        self.length -= 1 # length also needs to be controlled by soft_dequeue to mimic dequeue even though its not accurate
+        
+        return instruction
     
     def __str__(self):
         instructions = "" # refactor to do without list like in hw2
@@ -115,7 +204,14 @@ class InstructionQueue:
             instruction.append(current.operand2.get_name())
             instructions.append(instruction)
             """
-            #instructions += current.opcode + " | " + current.destination.get_name() + " | " + current.operand1.get_name() + " | " + current.operand2.get_name() + " | " + str(current.get_issued_cycle()) + " | " + str(current.get_execute_start_cycle()) + " | " + str(current.get_execute_end_cycle()) + " | " + str(current.get_write_back_cycle()) + "\n"
+            #instructions += current.opcode + " | "
+            #              + current.destination.get_name() + " | "
+            #              + current.operand1.get_name() + " | "
+            #              + current.operand2.get_name() + " | "
+            #              + str(current.get_issued_cycle()) + " | "
+            #              + str(current.get_execute_start_cycle()) + " | "
+            #              + str(current.get_execute_end_cycle()) + " | "
+            #              + str(current.get_write_back_cycle()) + "\n"
             instructions += str(current) + "\n"
             current = current.next
         return instructions
