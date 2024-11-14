@@ -308,7 +308,8 @@ class LoadBuffer: # need to verify loads work as indended
     def __init__(self, name, time=None, vj=None, qj=None, address=None, busy=False, instruction_pointer=None):
         self.name = name
         self.address = address
-        self.op = "LDDD" # add store instruction as well STRD
+        #self.op = "LDDD" # add store instruction as well STDD
+        self.op = None
         self.source = None
         self.source_buffer = None
         self.busy = busy
@@ -329,7 +330,6 @@ class LoadBuffer: # need to verify loads work as indended
 
     def get_address(self):
         return self.address
-
 
     def get_op(self):
         return self.op
@@ -357,6 +357,9 @@ class LoadBuffer: # need to verify loads work as indended
 
     def set_address(self, address):
         self.address = address
+
+    def set_op(self, opcode):
+        self.op = opcode
 
     def set_vj(self, vj):
         self.vj = vj
@@ -528,11 +531,13 @@ class Tomasulo:
                     issued = True
                     #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
-        else: # opcode == "LDDD"
+        else: # opcode == "LDDD" or opcode == "STDD"
             for lb in self.loadbuffers.values():
                 if lb.get_busy_status() == False and issued == False:
                     print("Avaliable Load Buffer " + lb.get_name())
-                    lb.set_time(self.instruction_latency["LDDD"])
+                    lb.set_op(opcode)
+                    #lb.set_time(self.instruction_latency["LDDD"])
+                    lb.set_time(self.instruction_latency[opcode])
                     lb.set_address(str(operand1) + " " + operand2.get_name()) # check data types
                     if operand2.get_buffer() != None:
                         lb.set_qj(operand2)
@@ -556,13 +561,13 @@ class Tomasulo:
         # maybe for instructions not able to be issued yet, make a seperate call stack or linked list structure to check which one should be issued next 
 
 
-    def execute_instructions(self): # NEED TO MOVE LOGIC TO EXECUTE INSTRUCTION SO AFTER INSTRUCTION QUEUE IS EMPTY EXECUTION CONTINUES/move q to v when ready
+    def execute_instructions(self): 
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
                 if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
                     if rs.get_time() == self.instruction_latency[rs.get_op()]:
                         rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
-                    # INFINITE LOOP DETECTED MUST FIX
+                    # INFINITE LOOP DETECTED MUST FIX (fixed with  better handling of source and desitination registers)
                     rs.set_time(rs.get_time()- 1)
                     rs.executing_cycles += 1
                     if rs.get_time() == 0:
@@ -661,7 +666,7 @@ class Tomasulo:
                     if lb.get_source().get_write_back() == False:
                         lb.get_source().set_write_back(True)
             if lb.get_busy_status() == True and lb.get_qj() != None:
-                print("QJ ", self.registers[lb.get_qj().get_name()].get_buffer())
+                #print("QJ ", self.registers[lb.get_qj().get_name()].get_buffer())
                 if self.registers[lb.get_qj().get_name()].get_buffer() == None:
                     lb.set_vj(lb.get_qj())
                     self.registers[lb.get_vj().get_name()].set_buffer(lb)
@@ -864,7 +869,7 @@ class address_offset(str):
 
 __builtins__.str = address_offset
 
-opcodes = ["ADDD", "SUBD", "MULTD", "DIVD", "LDDD"]
+opcodes = ["ADDD", "SUBD", "MULTD", "DIVD", "LDDD", "STDD"]
 
 # include this function outside class to keep consistent instruction stream among multiple tomasulo simulator confirgurations for testing functional unit utilization
 def generate_instruction_queue(opcodes, registers, number_instructions): # need to add checks to make sure loads are done first also to change the addresses of loads
@@ -878,7 +883,7 @@ def generate_instruction_queue(opcodes, registers, number_instructions): # need 
             operand1 = random.choice(list(registers.values()))
         while operand2.get_name() == destination.get_name() or operand2.get_name() == operand1.get_name():
             operand2 = random.choice(list(registers.values()))
-        if opcode == "LDDD":
+        if opcode == "LDDD" or opcode == "STDD":
             operand1 = str(str(random.choice(range(65536))) + "+") # extra wrapper for address_offset datatype
         instruction_queue.enqueue(opcode, destination, operand1, operand2)
     #print(instruction_queue)
@@ -899,7 +904,7 @@ def generate_registers(num_registers):
 # TEST CODE
 random.seed(1)
 registers = generate_registers(11)
-queue = generate_instruction_queue(opcodes, registers, 11)
+queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes)
 tomasulo.run_algorithim()
