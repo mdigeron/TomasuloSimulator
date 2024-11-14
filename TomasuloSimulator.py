@@ -432,7 +432,7 @@ class Tomasulo:
         for esh in range(self.num_fp_mult):
             self.fp_multipliers["MULT" + str(esh + 1)] = ReservationStation("MULT" + str(esh + 1))
         for esh in range(self.num_loadstore):
-            self.loadbuffers["LOAD" + str(esh + 1)] = LoadBuffer("LOAD" + str(esh + 1))
+            self.loadbuffers["LOAD/STORE" + str(esh + 1)] = LoadBuffer("LOAD/STORE" + str(esh + 1))
         """
         for esh in range(self.num_registers):
             self.registers["F" + str(esh)] = Register("F" + str(esh))
@@ -461,7 +461,7 @@ class Tomasulo:
 
     def display_loadbuffers(self):
         for name, lb in self.loadbuffers.items():
-            print("Load Buffer: " + name + " ", lb, " Busy Utilization: " + str(lb.busy_fraction) + " | Execution Utilization: " + str(lb.executing_fraction))
+            print("Load/Store Buffer: " + name + " ", lb, " Busy Utilization: " + str(lb.busy_fraction) + " | Execution Utilization: " + str(lb.executing_fraction))
 
     def display_registers(self):
         for register in self.registers.values():
@@ -534,7 +534,7 @@ class Tomasulo:
         else: # opcode == "LDDD" or opcode == "STDD"
             for lb in self.loadbuffers.values():
                 if lb.get_busy_status() == False and issued == False:
-                    print("Avaliable Load Buffer " + lb.get_name())
+                    print("Avaliable Load/Store Buffer " + lb.get_name())
                     lb.set_op(opcode)
                     #lb.set_time(self.instruction_latency["LDDD"])
                     lb.set_time(self.instruction_latency[opcode])
