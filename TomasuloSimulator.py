@@ -408,11 +408,12 @@ class Register:
         return(f"Register: {self.name} | Value: {self.value} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
 
 class Tomasulo:
-    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes):
+    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size):
         self.instruction_queue = instruction_queue
         self.num_fp_add = num_fp_add
         self.num_fp_mult = num_fp_mult
         self.num_loadstore = num_loadstore
+        self.dispatch_size = dispatch_size
         self.fp_adders = {}
         self.fp_multipliers = {}
         self.loadbuffers = {}
@@ -767,6 +768,7 @@ class Tomasulo:
     def run_algorithim(self): # add verbose mode to determine what is displayed
         while self.instruction_queue.is_empty() != True:
             print("\n")
+            #for i in range(self.dispatch_size):
             instruction = self.instruction_queue.soft_dequeue()
             issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
             if issued == False:
@@ -855,6 +857,6 @@ random.seed(1)
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1)
 tomasulo.run_algorithim()
 
