@@ -764,11 +764,10 @@ class Tomasulo:
             lb.busy_fraction = lb.busy_cycles/self.clock_cycle
             lb.executing_fraction = lb.executing_cycles/self.clock_cycle
     
-
+    
     def run_algorithim(self): # add verbose mode to determine what is displayed
         while self.instruction_queue.is_empty() != True:
             print("\n")
-            #for i in range(self.dispatch_size):
             instruction = self.instruction_queue.soft_dequeue()
             issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
             if issued == False:
@@ -797,6 +796,91 @@ class Tomasulo:
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
 
+    """
+    def run_algorithm(self):  # Add verbose mode to determine what is displayed
+        while not self.instruction_queue.is_empty():  # While the instruction queue is not empty
+            print("\n")
+        
+            # Try issuing two instructions at once
+            instructions = []
+            for _ in range(2):  # Try to issue up to two instructions
+                if not self.instruction_queue.is_empty():
+                    instructions.append(self.instruction_queue.soft_dequeue())
+        
+            # Issue the instructions
+            issued = [self.issue_instruction(instr) for instr in instructions]
+        
+            # Check if both instructions were successfully issued
+            while not all(issued):  # If any instruction wasn't issued, retry
+                for i, success in enumerate(issued):
+                    if not success:
+                        issued[i] = self.issue_instruction(instructions[i])
+            
+                # Perform the necessary simulation steps for each retry
+                self.write_back()
+                self.execute_instructions()
+                self.increment_clock_cycle()
+                self.update_utilizations()
+                self.display_simulation()
+
+            # If both instructions were issued, proceed with write-back and execution
+            self.write_back()
+            self.execute_instructions()
+            self.increment_clock_cycle()
+            self.update_utilizations()
+            self.display_simulation()
+
+        # After all instructions are issued, finish execution and write-back
+        while not self.empty_reservation_stations():  # Finish execution after all instructions are issued
+            self.write_back()
+            self.execute_instructions()
+            self.increment_clock_cycle()
+            self.update_utilizations()
+            self.display_simulation()
+    
+        print("\nRESULTS TABLE\n")
+        print(self.instruction_queue)
+    """
+    """
+    def run_algorithim(self): # add verbose mode to determine what is displayed
+        while self.instruction_queue.is_empty() != True:
+            print("\n")
+            stalled_instructions = []
+            for i in range(self.dispatch_size):
+                instruction = self.instruction_queue.soft_dequeue()
+                issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
+                if issued == False:
+                    stalled_instructions.append(instruction)
+            dispatch = 0
+            if len(stalled_instructions) > 0 and dispatch < self.dispatch_size:
+                issued == False
+                while issued == False:
+                    issued = self.issue_instruction(stalled_instructions[0])
+                    self.write_back()
+                    self.execute_instructions()
+                    #self.write_back()
+                    self.increment_clock_cycle()
+                    self.update_utilizations()
+                    self.display_simulation()
+                stalled_instructions.pop(0)
+                dispatch += 1
+            else:
+                self.write_back()
+                self.execute_instructions()
+                #self.write_back()
+                self.increment_clock_cycle()
+                self.update_utilizations()
+                self.display_simulation()
+        while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
+            self.write_back()
+            self.execute_instructions()
+            #self.write_back()
+            self.increment_clock_cycle()
+            self.update_utilizations()
+            self.display_simulation()
+        print("\nRESULTS TABLE\n")
+        print(self.instruction_queue)
+    """
     def display_simulation(self):
         # possibly the table format to display the simulation like on the slides use previously made helper functions to display
         print("\n")
@@ -810,7 +894,7 @@ class Tomasulo:
         print("\n")
         self.display_registers()
         print("\n")
-        
+    
         
 
 import matplotlib.pyplot as plt
@@ -857,6 +941,7 @@ random.seed(1)
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1)
+# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) # more than 2 num_fp_mult is causing an infinite loop with the current instruction queue
 tomasulo.run_algorithim()
 
