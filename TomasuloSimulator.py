@@ -881,6 +881,47 @@ class Tomasulo:
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
     """
+    def run_algorithim2Wide(self): # add verbose mode to determine what is displayed
+        while self.instruction_queue.is_empty() != True:
+            print("\n")
+            instruction1 = self.instruction_queue.soft_dequeue()
+            issued1 = self.issue_instruction(instruction1) # boolean based on if instruction was issued
+            instruction2= self.instruction_queue.soft_dequeue()
+            issued2 = self.issue_instruction(instruction2)
+            if issued1 == False or issued2 == False:
+                while issued1 == False:
+                    issued1 = self.issue_instruction(instruction1)
+                    self.write_back()
+                    self.execute_instructions()
+                    #self.write_back()
+                    self.increment_clock_cycle()
+                    self.update_utilizations()
+                    self.display_simulation()
+                while issued2 == False:
+                    issued2 = self.issue_instruction(instruction2)
+                    self.write_back()
+                    self.execute_instructions()
+                    #self.write_back()
+                    self.increment_clock_cycle()
+                    self.update_utilizations()
+                    self.display_simulation()
+            else:
+                self.write_back()
+                self.execute_instructions()
+                #self.write_back()
+                self.increment_clock_cycle()
+                self.update_utilizations()
+                self.display_simulation()
+        while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
+            self.write_back()
+            self.execute_instructions()
+            #self.write_back()
+            self.increment_clock_cycle()
+            self.update_utilizations()
+            self.display_simulation()
+        print("\nRESULTS TABLE\n")
+        print(self.instruction_queue)
+
     def display_simulation(self):
         # possibly the table format to display the simulation like on the slides use previously made helper functions to display
         print("\n")
@@ -944,4 +985,5 @@ print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) # more than 2 num_fp_mult is causing an infinite loop with the current instruction queue
 tomasulo.run_algorithim()
+#tomasulo.run_algorithim2Wide()
 
