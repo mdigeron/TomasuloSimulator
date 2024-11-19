@@ -373,7 +373,7 @@ class LoadBuffer:
         self.instruction_pointer = instruction
 
     def __str__(self):
-        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Address: {self.address}")
+        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Address: {self.address}")
         
 
 class Register:
