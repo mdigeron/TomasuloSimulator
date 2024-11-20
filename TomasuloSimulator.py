@@ -539,8 +539,8 @@ class Tomasulo:
         if issued == False:
             print("No avalible Function Units this  clock cycle for Instruction: ", instruction)
         return issued # determine if instruction issued or not, if not issued need to be next instrucion instead of new front of queue
-
-
+    # working execute_instructions() function
+    """
     def execute_instructions(self): 
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
@@ -647,7 +647,148 @@ class Tomasulo:
             if lb.get_busy_status() == True:
                 lb.busy_cycles += 1
      
-
+    """
+    # issue with source registers blocking, need a pass/check for that
+    def execute_instructions(self):
+        # 1st pass to check if vj or vk occupied
+        for rs in self.fp_adders.values():
+            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
+                if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
+                    if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                        rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    rs.set_time(rs.get_time()- 1)
+                    rs.executing_cycles += 1
+                    if rs.get_time() == 0:
+                        rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:  
+                    rs.instruction_pointer.set_issue_delay(False)
+                    if rs.get_vk().get_write_back() == False:
+                        rs.get_vk().set_write_back(True)
+                    if rs.get_vj().get_write_back() == False:
+                        rs.get_vj().set_write_back(True)
+                    if rs.get_source().get_write_back() == False:
+                        rs.get_source().set_write_back(True)
+            
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None:
+                if self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                    rs.set_vj(rs.get_qj())
+                    self.registers[rs.get_vj().get_name()].set_buffer(rs)
+                    rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None:
+                if self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                    rs.set_vk(rs.get_qk())
+                    self.registers[rs.get_vk().get_name()].set_buffer(rs)
+                    rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            
+            if rs.get_busy_status() == True and rs.get_source_buffer() != None:
+                if self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                    rs.set_source(rs.get_source_buffer())
+                    self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                    rs.set_source_buffer(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True:
+                rs.busy_cycles += 1
+        for rs in self.fp_multipliers.values():
+            if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
+                if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
+                    if rs.get_time() == self.instruction_latency[rs.get_op()]:
+                        rs.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    rs.set_time(rs.get_time()- 1)
+                    rs.executing_cycles += 1
+                    if rs.get_time() == 0:
+                        rs.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:
+                    rs.instruction_pointer.set_issue_delay(False)
+                    if rs.get_vk().get_write_back() == False:
+                        rs.get_vk().set_write_back(True)
+                    if rs.get_vj().get_write_back() == False:
+                        rs.get_vj().set_write_back(True)
+                    if rs.get_source().get_write_back() == False:
+                        rs.get_source().set_write_back(True)
+                        
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None:
+                if self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                    rs.set_vj(rs.get_qj())
+                    self.registers[rs.get_vj().get_name()].set_buffer(rs)
+                    rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None:
+                if self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                    rs.set_vk(rs.get_qk())
+                    self.registers[rs.get_vk().get_name()].set_buffer(rs)
+                    rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+                
+            if rs.get_busy_status() == True and rs.get_source_buffer() != None:
+                if self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                    rs.set_source(rs.get_source_buffer())
+                    self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                    rs.set_source_buffer(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True:
+                    rs.busy_cycles += 1
+        for lb in self.loadbuffers.values():
+            if lb.get_busy_status() == True and lb.get_qj() == None and lb.get_source_buffer() == None:
+                if lb.instruction_pointer.issue_delay == False and lb.get_vj().get_write_back() == True and lb.get_source().get_write_back() == True: # NOT GETTING IN HERE
+                    if lb.get_time() == self.instruction_latency[lb.get_op()]:
+                        lb.instruction_pointer.set_execute_start_cycle(self.clock_cycle)
+                    lb.set_time(lb.get_time()- 1)
+                    lb.executing_cycles += 1
+                    if lb.get_time() == 0:
+                        lb.instruction_pointer.set_execute_end_cycle(self.clock_cycle)
+                else:
+                    lb.instruction_pointer.set_issue_delay(False)
+                    if lb.get_vj().get_write_back() == False:
+                        lb.get_vj().set_write_back(True)
+                    if lb.get_source().get_write_back() == False:
+                        lb.get_source().set_write_back(True)
+            if lb.get_busy_status() == True and lb.get_qj() != None:
+                if self.registers[lb.get_qj().get_name()].get_buffer() == None:
+                    lb.set_vj(lb.get_qj())
+                    self.registers[lb.get_vj().get_name()].set_buffer(lb)
+                    lb.set_qj(None)
+                lb.instruction_pointer.set_issue_delay(False)
+            if lb.get_busy_status() == True and lb.get_source_buffer() != None:
+                if self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
+                    # source and source buffer
+                    lb.set_source(lb.get_source_buffer())
+                    self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
+                    lb.set_source_buffer(None)
+                lb.instruction_pointer.set_issue_delay(False)
+            if lb.get_busy_status() == True:
+                lb.busy_cycles += 1
+        # second pass only requires some of the checks
+        for rs in self.fp_adders.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None:
+                if self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                    rs.set_vj(rs.get_qj())
+                    self.registers[rs.get_vj().get_name()].set_buffer(rs)
+                    rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_qk() != None:
+                if self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                    rs.set_vk(rs.get_qk())
+                    self.registers[rs.get_vk().get_name()].set_buffer(rs)
+                    rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+        for rs in self.fp_multipliers.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None:
+                if self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                    rs.set_vj(rs.get_qj())
+                    self.registers[rs.get_vj().get_name()].set_buffer(rs)
+                    rs.set_qj(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            if rs.get_busy_status() == True and rs.get_qk() != None:
+                if self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                    rs.set_vk(rs.get_qk())
+                    self.registers[rs.get_vk().get_name()].set_buffer(rs)
+                    rs.set_qk(None)
+                rs.instruction_pointer.set_issue_delay(False)
+            
+     
+    
     def write_back(self): 
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_time() == 0:
@@ -703,10 +844,87 @@ class Tomasulo:
                 lb.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 lb.set_instruction_pointer(None)
         self.check_register_buffers()
-
+    """
     def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
+                rs.set_vj(rs.get_qj())
+                self.registers[rs.get_qj().get_name()].set_buffer(rs)
+                rs.set_qj(None)
+            elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                rs.set_vk(rs.get_qk())
+                self.registers[rs.get_qk().get_name()].set_buffer(rs)
+                rs.set_qk(None)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
+        for rs in self.fp_multipliers.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                rs.set_vj(rs.get_qj())
+                self.registers[rs.get_qj().get_name()].set_buffer(rs)
+                rs.set_qj(None)
+            elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                rs.set_vk(rs.get_qk())
+                self.registers[rs.get_qk().get_name()].set_buffer(rs)
+                rs.set_qk(None)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
+        for lb in self.loadbuffers.values():
+            if lb.get_busy_status() == True and lb.get_qj() != None and self.registers[lb.get_qj().get_name()].get_buffer() == None:
+                lb.set_vj(lb.get_qj())
+                self.registers[lb.get_qj().get_name()].set_buffer(lb)
+                lb.set_qj(None)
+            elif lb.get_busy_status() == True and lb.get_source_buffer() != None and self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
+                lb.set_source(lb.get_source_buffer())
+                self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
+                lb.set_source_buffer(None)
+    """
+    def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
+        # add a pass to check if other v station != None to prevent deadlocks
+        
+        for rs in self.fp_adders.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
+                rs.set_vj(rs.get_qj())
+                self.registers[rs.get_qj().get_name()].set_buffer(rs)
+                rs.set_qj(None)
+            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                rs.set_vk(rs.get_qk())
+                self.registers[rs.get_qk().get_name()].set_buffer(rs)
+                rs.set_qk(None)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
+        for rs in self.fp_multipliers.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
+                rs.set_vj(rs.get_qj())
+                self.registers[rs.get_qj().get_name()].set_buffer(rs)
+                rs.set_qj(None)
+            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+                rs.set_vk(rs.get_qk())
+                self.registers[rs.get_qk().get_name()].set_buffer(rs)
+                rs.set_qk(None)
+            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
+                rs.set_source(rs.get_source_buffer())
+                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
+                rs.set_source_buffer(None)
+        # only need 1 pass for loadbuffers
+        """
+        for lb in self.loadbuffers.values():
+            if lb.get_busy_status() == True and lb.get_qj() != None and self.registers[lb.get_qj().get_name()].get_buffer() == None:
+                lb.set_vj(lb.get_qj())
+                self.registers[lb.get_qj().get_name()].set_buffer(lb)
+                lb.set_qj(None)
+            elif lb.get_busy_status() == True and lb.get_source_buffer() != None and self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
+                lb.set_source(lb.get_source_buffer())
+                self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
+                lb.set_source_buffer(None)
+        """
+        for rs in self.fp_adders.values():
+            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: 
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
