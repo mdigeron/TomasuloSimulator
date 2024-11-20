@@ -706,7 +706,7 @@ class Tomasulo:
 
     def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
         for rs in self.fp_adders.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python add is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
+            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
@@ -763,7 +763,8 @@ class Tomasulo:
         for lb in self.loadbuffers.values():
             lb.busy_fraction = lb.busy_cycles/self.clock_cycle
             lb.executing_fraction = lb.executing_cycles/self.clock_cycle
-    
+            
+    # TRY REORDERING CHECKS 
     def deadlockQBuffer(self): # where should this be placed? (before vjs and vks are set)
         # loop through all reservation stations to check if multiple stations have same register in qj/qk/source_buffer?
         # if there is a shared dependency, before setting either vj/k value check to see if any rs already has one of the vj/vk values set so it can start executing and avoid deadlock
@@ -808,7 +809,42 @@ class Tomasulo:
                     priority_queue.insert(0,priority_queue.pop(priority_queue.index(rs)))
         # now can assign to the front of the queue
         # maybe just return the rs and use that as a check to see if its the same as the register being assigned?
-        return priority_queue.pop(0)
+        return priority_queue.pop(0) # this just pops the register does not consider if its the same
+
+    def generate_duplicated_qbuffers(self):
+        qj_buffers = [] 
+        qk_buffers = []
+        for rs in self.fp_adders.values():
+            if rs.get_qj() != None:
+                qj_buffers.append(rs.get_qj().get_name())
+            if rs.get_qk() != None:
+                qk_buffers.append(rs.get_qk().get_name())
+        for rs in self.fp_multipliers.values():
+            if rs.get_qj() != None:
+                qj_buffers.append(rs.get_qj().get_name())
+            if rs.get_qk() != None:
+                qk_buffers.append(rs.get_qk().get_name())
+        for lb in self.loadbuffers.values():
+            if lb.get_qj() != None:
+                qj_buffers.append(lb.get_qj().get_name())
+        for qj in set(qj_buffers): 
+            if qj_buffers.count(qj) == 1:
+                qj_buffers.remove(qj)
+        for qk in set(qk_buffers): 
+            if qk_buffers.count(qk) == 1:
+                qk_buffers.remove(qk)
+        return qj_buffers, qk_buffers
+    
+    def isDeadlock(self, qj_buffers, qk_buffers):
+        if len(qj_buffers) > 0 or len(qk_buffers) > 0:
+            return True
+        else:
+            return False
+
+    def assign_priority_register(self):
+        pass # check which register to use
+        
+        
         
     
     def run_algorithim(self): # add verbose mode to determine what is displayed
