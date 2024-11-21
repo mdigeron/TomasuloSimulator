@@ -982,87 +982,6 @@ class Tomasulo:
         for lb in self.loadbuffers.values():
             lb.busy_fraction = lb.busy_cycles/self.clock_cycle
             lb.executing_fraction = lb.executing_cycles/self.clock_cycle
-            
-    # TRY REORDERING CHECKS 
-    def deadlockQBuffer(self): # where should this be placed? (before vjs and vks are set)
-        # loop through all reservation stations to check if multiple stations have same register in qj/qk/source_buffer?
-        # if there is a shared dependency, before setting either vj/k value check to see if any rs already has one of the vj/vk values set so it can start executing and avoid deadlock
-        # lb checks might not be needed should not lock
-        # split 2 functions? isQDeadLock() (returns boolean or a list) and DeadlockQBuffer() (returns the register that should get the buffer register assigned)?
-        priority_queue = []
-        #source_buffers = [] # may not need source because it should not be issued if waiting for source register, check logic
-        qj_buffers = [] # list of reservation stations or names?
-        qk_buffers = []
-        for rs in self.fp_adders.values():
-            if rs.get_qj() != None:
-                qj_buffers.append(rs.get_qj().get_name())
-            if rs.get_qk() != None:
-                qk_buffers.append(rs.get_qk().get_name())
-        for rs in self.fp_multipliers.values():
-            if rs.get_qj() != None:
-                qj_buffers.append(rs.get_qj().get_name())
-            if rs.get_qk() != None:
-                qk_buffers.append(rs.get_qk().get_name())
-        for lb in self.loadbuffers.values():
-            if lb.get_qj() != None:
-                qj_buffers.append(lb.get_qj().get_name())
-        # only need duplicates
-        for qj in set(qj_buffers): # rs.get_name() or rs?
-            if qj_buffers.count(qj) == 1:
-                qj_buffers.remove(qj)
-        for qk in set(qk_buffers): # rs.get_name() or rs?
-            if qk_buffers.count(qk) == 1:
-                qk_buffers.remove(qk)
-        for rs in self.fp_adders.values():
-            if rs.get_qj().get_name() in qj_buffers or rs.get_qk().get_name() in qk_buffers:
-                priority_queue.append(rs)
-        for rs in self.fp_multipliers.values():
-            if rs.get_qj().get_name() in qj_buffers or rs.get_qk().get_name() in qk_buffers:
-                priority_queue.append(rs)
-        for lb in self.loadbuffers.values():
-            if lb.get_qj().get_name() in qj_buffers:
-                priority_queue.append(lb)
-        for rs in priority_queue: # mixting rs and lb, lb has no vk
-            if rs in self.fp_adders.values() or rs in self.fp_multipliers.values():
-                if rs.get_vj() != None or rs.get_vk() != None: # give priority to rs that are ready to execute
-                    priority_queue.insert(0,priority_queue.pop(priority_queue.index(rs)))
-        # now can assign to the front of the queue
-        # maybe just return the rs and use that as a check to see if its the same as the register being assigned?
-        return priority_queue.pop(0) # this just pops the register does not consider if its the same
-
-    def generate_duplicated_qbuffers(self):
-        qj_buffers = [] 
-        qk_buffers = []
-        for rs in self.fp_adders.values():
-            if rs.get_qj() != None:
-                qj_buffers.append(rs.get_qj().get_name())
-            if rs.get_qk() != None:
-                qk_buffers.append(rs.get_qk().get_name())
-        for rs in self.fp_multipliers.values():
-            if rs.get_qj() != None:
-                qj_buffers.append(rs.get_qj().get_name())
-            if rs.get_qk() != None:
-                qk_buffers.append(rs.get_qk().get_name())
-        for lb in self.loadbuffers.values():
-            if lb.get_qj() != None:
-                qj_buffers.append(lb.get_qj().get_name())
-        for qj in set(qj_buffers): 
-            if qj_buffers.count(qj) == 1:
-                qj_buffers.remove(qj)
-        for qk in set(qk_buffers): 
-            if qk_buffers.count(qk) == 1:
-                qk_buffers.remove(qk)
-        return qj_buffers, qk_buffers
-    
-    def isDeadlock(self, qj_buffers, qk_buffers):
-        if len(qj_buffers) > 0 or len(qk_buffers) > 0:
-            return True
-        else:
-            return False
-
-    def assign_priority_register(self):
-        pass # check which register to use
-
 
     def buffer_registers(self): # list of registers that are in qj, qk and source buffer to be used to check when to block issue instruction
         registers = []
@@ -1306,7 +1225,7 @@ registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
-tomasulo = Tomasulo(queue, 3, 3, 3, registers, opcodes, 1) # more than 2 num_fp_mult is causing an infinite loop with the current instruction queue (deadlock function(s) fix)
+tomasulo = Tomasulo(queue, 3, 3, 3, registers, opcodes, 1) 
 tomasulo.run_algorithim()
 #tomasulo.run_algorithim2Wide()
 
