@@ -296,7 +296,7 @@ class ReservationStation:
         self.instruction_pointer = instruction
 
     def __str__(self):
-        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Vj: {self.vj.get_name()  if self.vj != None else None} | Vk: {self.vk.get_name() if self.vk != None else None} | Qj: {self.qj.get_name() if self.qj != None else None} | Qk: {self.qk.get_name() if self.qk != None else None}")
+        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Source: {self.get_source().get_name() if self.get_source() != None else None} | Source Buffer: {self.get_source_buffer().get_name() if self.get_source_buffer() != None else None} | Vj: {self.vj.get_name()  if self.vj != None else None} | Vk: {self.vk.get_name() if self.vk != None else None} | Qj: {self.qj.get_name() if self.qj != None else None} | Qk: {self.qk.get_name() if self.qk != None else None}")
 
 class LoadBuffer:
     def __init__(self, name, time=None, vj=None, qj=None, address=None, busy=False, instruction_pointer=None):
@@ -373,7 +373,7 @@ class LoadBuffer:
         self.instruction_pointer = instruction
 
     def __str__(self):
-        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Address: {self.address}")
+        return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Source: {self.get_source().get_name() if self.get_source() != None else None} | Source Buffer: {self.get_source_buffer().get_name() if self.get_source_buffer() != None else None} | Address: {self.address}")
         
 
 class Register:
@@ -669,13 +669,13 @@ class Tomasulo:
                     if rs.get_source().get_write_back() == False:
                         rs.get_source().set_write_back(True)
             
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None:
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
                     rs.set_vj(rs.get_qj())
                     self.registers[rs.get_vj().get_name()].set_buffer(rs)
                     rs.set_qj(None)
                 rs.instruction_pointer.set_issue_delay(False)
-            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None:
+            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None:
                 if self.registers[rs.get_qk().get_name()].get_buffer() == None:
                     rs.set_vk(rs.get_qk())
                     self.registers[rs.get_vk().get_name()].set_buffer(rs)
@@ -708,13 +708,13 @@ class Tomasulo:
                     if rs.get_source().get_write_back() == False:
                         rs.get_source().set_write_back(True)
                         
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None:
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
                     rs.set_vj(rs.get_qj())
                     self.registers[rs.get_vj().get_name()].set_buffer(rs)
                     rs.set_qj(None)
                 rs.instruction_pointer.set_issue_delay(False)
-            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None:
+            if rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None:
                 if self.registers[rs.get_qk().get_name()].get_buffer() == None:
                     rs.set_vk(rs.get_qk())
                     self.registers[rs.get_vk().get_name()].set_buffer(rs)
