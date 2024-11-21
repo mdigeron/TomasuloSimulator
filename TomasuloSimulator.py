@@ -845,7 +845,7 @@ class Tomasulo:
                 lb.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 lb.set_instruction_pointer(None)
         self.check_register_buffers()
-    """
+    
     def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
@@ -882,84 +882,7 @@ class Tomasulo:
                 lb.set_source(lb.get_source_buffer())
                 self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
                 lb.set_source_buffer(None)
-    """
-    def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
-        # add a pass to check if other v station != None to prevent deadlocks
-        
-        for rs in self.fp_adders.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
-                rs.set_vj(rs.get_qj())
-                self.registers[rs.get_qj().get_name()].set_buffer(rs)
-                rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
-                rs.set_vk(rs.get_qk())
-                self.registers[rs.get_qk().get_name()].set_buffer(rs)
-                rs.set_qk(None)
-            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
-                rs.set_source(rs.get_source_buffer())
-                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
-                rs.set_source_buffer(None)
-        for rs in self.fp_multipliers.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
-                rs.set_vj(rs.get_qj())
-                self.registers[rs.get_qj().get_name()].set_buffer(rs)
-                rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
-                rs.set_vk(rs.get_qk())
-                self.registers[rs.get_qk().get_name()].set_buffer(rs)
-                rs.set_qk(None)
-            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
-                rs.set_source(rs.get_source_buffer())
-                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
-                rs.set_source_buffer(None)
-        # only need 1 pass for loadbuffers
-        """
-        for lb in self.loadbuffers.values():
-            if lb.get_busy_status() == True and lb.get_qj() != None and self.registers[lb.get_qj().get_name()].get_buffer() == None:
-                lb.set_vj(lb.get_qj())
-                self.registers[lb.get_qj().get_name()].set_buffer(lb)
-                lb.set_qj(None)
-            elif lb.get_busy_status() == True and lb.get_source_buffer() != None and self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
-                lb.set_source(lb.get_source_buffer())
-                self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
-                lb.set_source_buffer(None)
-        """
-        for rs in self.fp_adders.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: 
-                rs.set_vj(rs.get_qj())
-                self.registers[rs.get_qj().get_name()].set_buffer(rs)
-                rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
-                rs.set_vk(rs.get_qk())
-                self.registers[rs.get_qk().get_name()].set_buffer(rs)
-                rs.set_qk(None)
-            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
-                rs.set_source(rs.get_source_buffer())
-                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
-                rs.set_source_buffer(None)
-        for rs in self.fp_multipliers.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
-                rs.set_vj(rs.get_qj())
-                self.registers[rs.get_qj().get_name()].set_buffer(rs)
-                rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
-                rs.set_vk(rs.get_qk())
-                self.registers[rs.get_qk().get_name()].set_buffer(rs)
-                rs.set_qk(None)
-            elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
-                rs.set_source(rs.get_source_buffer())
-                self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
-                rs.set_source_buffer(None)
-        for lb in self.loadbuffers.values():
-            if lb.get_busy_status() == True and lb.get_qj() != None and self.registers[lb.get_qj().get_name()].get_buffer() == None:
-                lb.set_vj(lb.get_qj())
-                self.registers[lb.get_qj().get_name()].set_buffer(lb)
-                lb.set_qj(None)
-            elif lb.get_busy_status() == True and lb.get_source_buffer() != None and self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
-                lb.set_source(lb.get_source_buffer())
-                self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
-                lb.set_source_buffer(None)
-
+    
     def empty_reservation_stations(self):
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True:
