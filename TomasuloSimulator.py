@@ -462,9 +462,10 @@ class Tomasulo:
         destination = instruction.get_destination()
         operand1 = instruction.get_operand1()
         operand2 = instruction.get_operand2()
+        registers = self.buffer_registers()
         if opcode == "ADDD" or opcode == "SUBD":
             for rs in self.fp_adders.values():
-                if rs.get_busy_status() == False and issued == False:
+                if rs.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand1.get_name() not in registers and operand2.get_name() not in registers:
                     print("Avaliable Reservation Station " + rs.get_name())
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
@@ -490,7 +491,7 @@ class Tomasulo:
                     print("Issued: ", instruction)
         elif opcode == "MULTD" or opcode == "DIVD":
             for rs in self.fp_multipliers.values():
-                if rs.get_busy_status() == False and issued == False:
+                if rs.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand1.get_name() not in registers and operand2.get_name() not in registers:
                     print("Avaliable Reservation Station " + rs.get_name())
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
@@ -516,7 +517,7 @@ class Tomasulo:
                     print("Issued: ", instruction)
         else: # opcode == "LDDD" or opcode == "STDD"
             for lb in self.loadbuffers.values():
-                if lb.get_busy_status() == False and issued == False:
+                if lb.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand2.get_name() not in registers:
                     print("Avaliable Load/Store Buffer " + lb.get_name())
                     lb.set_op(opcode)
                     lb.set_time(self.instruction_latency[opcode])
@@ -886,11 +887,11 @@ class Tomasulo:
         # add a pass to check if other v station != None to prevent deadlocks
         
         for rs in self.fp_adders.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python and is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
@@ -899,11 +900,11 @@ class Tomasulo:
                 self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
                 rs.set_source_buffer(None)
         for rs in self.fp_multipliers.values():
-            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
+            if rs.get_busy_status() == True and rs.get_qj() != None and rs.get_vk() != None and rs.get_source_buffer() == None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
-            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
+            elif rs.get_busy_status() == True and rs.get_qk() != None and rs.get_vj() != None and rs.get_source_buffer() == None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
@@ -1061,10 +1062,32 @@ class Tomasulo:
 
     def assign_priority_register(self):
         pass # check which register to use
+
+
+    def buffer_registers(self): # list of registers that are in qj, qk and source buffer to be used to check when to block issue instruction
+        registers = []
+        for rs in self.fp_adders.values():
+            if rs.get_qj() != None:
+                registers.append(rs.get_qj().get_name())
+            if rs.get_qk() != None:
+                registers.append(rs.get_qk().get_name())
+            if rs.get_source_buffer() != None:
+                registers.append(rs.get_source_buffer().get_name())
+        for rs in self.fp_multipliers.values():
+            if rs.get_qj() != None:
+                registers.append(rs.get_qj().get_name())
+            if rs.get_qk() != None:
+                registers.append(rs.get_qk().get_name())
+            if rs.get_source_buffer() != None:
+                registers.append(rs.get_source_buffer().get_name())
+        for lb in self.loadbuffers.values():
+            if lb.get_qj() != None:
+                registers.append(lb.get_qj().get_name())
+            if lb.get_source_buffer() != None:
+                registers.append(lb.get_source_buffer().get_name())
+        return registers
         
         
-        
-    
     def run_algorithim(self): # add verbose mode to determine what is displayed
         while self.instruction_queue.is_empty() != True:
             print("\n")
@@ -1283,7 +1306,7 @@ registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) # more than 2 num_fp_mult is causing an infinite loop with the current instruction queue (deadlock function(s) fix)
+tomasulo = Tomasulo(queue, 3, 3, 3, registers, opcodes, 1) # more than 2 num_fp_mult is causing an infinite loop with the current instruction queue (deadlock function(s) fix)
 tomasulo.run_algorithim()
 #tomasulo.run_algorithim2Wide()
 
