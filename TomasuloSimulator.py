@@ -896,141 +896,10 @@ class Tomasulo:
                 self.update_simulation_results()
             print("\nRESULTS TABLE\n")
             print(self.instruction_queue)
-            return self.instruction_queue, self.output
+            return self.instruction_queue, self.output # need to also return individual execution utilization values for plotting
         else:
             raise ValueError("Please make sure dispatch_size parameter in Tomalulo class variable is either 1 or 2")
 
-
-    """
-    def run_algorithm(self):  # Add verbose mode to determine what is displayed
-        while not self.instruction_queue.is_empty():  # While the instruction queue is not empty
-            print("\n")
-        
-            # Try issuing two instructions at once
-            instructions = []
-            for _ in range(2):  # Try to issue up to two instructions
-                if not self.instruction_queue.is_empty():
-                    instructions.append(self.instruction_queue.soft_dequeue())
-        
-            # Issue the instructions
-            issued = [self.issue_instruction(instr) for instr in instructions]
-        
-            # Check if both instructions were successfully issued
-            while not all(issued):  # If any instruction wasn't issued, retry
-                for i, success in enumerate(issued):
-                    if not success:
-                        issued[i] = self.issue_instruction(instructions[i])
-            
-                # Perform the necessary simulation steps for each retry
-                self.write_back()
-                self.execute_instructions()
-                self.increment_clock_cycle()
-                self.update_utilizations()
-                self.display_simulation()
-
-            # If both instructions were issued, proceed with write-back and execution
-            self.write_back()
-            self.execute_instructions()
-            self.increment_clock_cycle()
-            self.update_utilizations()
-            self.display_simulation()
-
-        # After all instructions are issued, finish execution and write-back
-        while not self.empty_reservation_stations():  # Finish execution after all instructions are issued
-            self.write_back()
-            self.execute_instructions()
-            self.increment_clock_cycle()
-            self.update_utilizations()
-            self.display_simulation()
-    
-        print("\nRESULTS TABLE\n")
-        print(self.instruction_queue)
-    """
-    """
-    def run_algorithim(self): # add verbose mode to determine what is displayed
-        while self.instruction_queue.is_empty() != True:
-            print("\n")
-            stalled_instructions = []
-            for i in range(self.dispatch_size):
-                instruction = self.instruction_queue.soft_dequeue()
-                issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
-                if issued == False:
-                    stalled_instructions.append(instruction)
-            dispatch = 0
-            if len(stalled_instructions) > 0 and dispatch < self.dispatch_size:
-                issued == False
-                while issued == False:
-                    issued = self.issue_instruction(stalled_instructions[0])
-                    self.write_back()
-                    self.execute_instructions()
-                    #self.write_back()
-                    self.increment_clock_cycle()
-                    self.update_utilizations()
-                    self.display_simulation()
-                stalled_instructions.pop(0)
-                dispatch += 1
-            else:
-                self.write_back()
-                self.execute_instructions()
-                #self.write_back()
-                self.increment_clock_cycle()
-                self.update_utilizations()
-                self.display_simulation()
-        while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
-            self.write_back()
-            self.execute_instructions()
-            #self.write_back()
-            self.increment_clock_cycle()
-            self.update_utilizations()
-            self.display_simulation()
-        print("\nRESULTS TABLE\n")
-        print(self.instruction_queue)
-    """
-    def run_algorithim2Wide(self): # add verbose mode to determine what is displayed
-        while self.instruction_queue.is_empty() != True:
-            print("\n")
-            instruction1 = self.instruction_queue.soft_dequeue()
-            issued1 = self.issue_instruction(instruction1) # boolean based on if instruction was issued
-            instruction2= self.instruction_queue.soft_dequeue()
-            issued2 = self.issue_instruction(instruction2)
-            if issued1 == False or issued2 == False:
-                while issued1 == False:
-                    issued1 = self.issue_instruction(instruction1)
-                    self.write_back()
-                    self.execute_instructions()
-                    #self.write_back()
-                    self.increment_clock_cycle()
-                    self.update_utilizations()
-                    self.display_simulation()
-                    self.update_simulation_results()
-                while issued2 == False:
-                    issued2 = self.issue_instruction(instruction2)
-                    self.write_back()
-                    self.execute_instructions()
-                    #self.write_back()
-                    self.increment_clock_cycle()
-                    self.update_utilizations()
-                    self.display_simulation()
-                    self.update_simulation_results()
-            else:
-                self.write_back()
-                self.execute_instructions()
-                #self.write_back()
-                self.increment_clock_cycle()
-                self.update_utilizations()
-                self.display_simulation()
-                self.update_simulation_results()
-        while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
-            self.write_back()
-            self.execute_instructions()
-            #self.write_back()
-            self.increment_clock_cycle()
-            self.update_utilizations()
-            self.display_simulation()
-            self.update_simulation_results()
-        print("\nRESULTS TABLE\n")
-        print(self.instruction_queue)
-        return self.instruction_queue, self.output
 
     def display_simulation(self):
         print("\n")
@@ -1099,5 +968,4 @@ print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) 
 results_table, simulation_results = tomasulo.run_algorithim()
-#tomasulo.run_algorithim2Wide()
 
