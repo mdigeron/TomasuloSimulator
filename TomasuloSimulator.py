@@ -431,7 +431,7 @@ class Tomasulo:
             while type(latency) != type(1):
                 latency = int(input("Enter latency for " + opcode + ":"))
             self.instruction_latency[opcode] = latency
-        self.table = None # possible data structure for displaying instruction and write information (currently not used)
+        self.output = []
         
     def increment_clock_cycle(self):
         self.clock_cycle += 1
@@ -439,7 +439,7 @@ class Tomasulo:
     def get_clock_cycle(self):
         return self.clock_cycle
 
-    def display_adders(self): # make formatting look better
+    def display_adders(self):
         for name, rs in self.fp_adders.items():
             print("Reservation Station: " + name + " ", rs,  " Busy Utilization: " + str(rs.busy_fraction) + " | Execution Utilization: " + str(rs.executing_fraction))
 
@@ -454,6 +454,34 @@ class Tomasulo:
     def display_registers(self):
         for register in self.registers.values():
             print(register)
+
+    def return_adders_string(self):
+        output = ""
+        for name, rs in self.fp_adders.items():
+            output += str("Reservation Station: " + name + " " + str(rs) +  " Busy Utilization: " + str(rs.busy_fraction) + " | Execution Utilization: " + str(rs.executing_fraction))
+            output += "\n"
+        return output
+
+    def return_multipliers_string(self):
+        output = ""
+        for name, rs in self.fp_multipliers.items():
+            output += str("Reservation Station: " + name + " " + str(rs) +  " Busy Utilization: " + str(rs.busy_fraction) + " | Execution Utilization: " + str(rs.executing_fraction))
+            output += "\n"
+        return output
+
+    def return_loadbuffers_string(self):
+        output = ""
+        for name, lb in self.loadbuffers.items():
+            output += str("Load/Store Buffer: " + name + " " + str(lb) + " Busy Utilization: " + str(lb.busy_fraction) + " | Execution Utilization: " + str(lb.executing_fraction))
+            output += "\n"
+        return output
+
+    def return_registers_string(self):
+        output = ""
+        for register in self.registers.values():
+            output += str(register)
+            output += "\n"
+        return output
 
 
     def issue_instruction(self, instruction):
@@ -788,6 +816,7 @@ class Tomasulo:
         
         
     def run_algorithim(self): # add verbose mode to determine what is displayed
+        self.update_simulation_results()
         while self.instruction_queue.is_empty() != True:
             print("\n")
             instruction = self.instruction_queue.soft_dequeue()
@@ -801,6 +830,7 @@ class Tomasulo:
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     self.display_simulation()
+                    self.update_simulation_results()
             else:
                 self.write_back()
                 self.execute_instructions()
@@ -808,6 +838,7 @@ class Tomasulo:
                 self.increment_clock_cycle()
                 self.update_utilizations()
                 self.display_simulation()
+                self.update_simulation_results()
         while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
             self.write_back()
             self.execute_instructions()
@@ -815,8 +846,10 @@ class Tomasulo:
             self.increment_clock_cycle()
             self.update_utilizations()
             self.display_simulation()
+            self.update_simulation_results()
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
+        return self.instruction_queue, self.output
 
     """
     def run_algorithm(self):  # Add verbose mode to determine what is displayed
@@ -919,6 +952,7 @@ class Tomasulo:
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     self.display_simulation()
+                    self.update_simulation_results()
                 while issued2 == False:
                     issued2 = self.issue_instruction(instruction2)
                     self.write_back()
@@ -927,6 +961,7 @@ class Tomasulo:
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     self.display_simulation()
+                    self.update_simulation_results()
             else:
                 self.write_back()
                 self.execute_instructions()
@@ -934,6 +969,7 @@ class Tomasulo:
                 self.increment_clock_cycle()
                 self.update_utilizations()
                 self.display_simulation()
+                self.update_simulation_results()
         while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
             self.write_back()
             self.execute_instructions()
@@ -941,11 +977,12 @@ class Tomasulo:
             self.increment_clock_cycle()
             self.update_utilizations()
             self.display_simulation()
+            self.update_simulation_results()
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
+        return self.instruction_queue, self.output
 
     def display_simulation(self):
-        # possibly the table format to display the simulation like on the slides use previously made helper functions to display
         print("\n")
         print(f"Clock Cycle: {self.clock_cycle}")
         print("\n")
@@ -957,6 +994,10 @@ class Tomasulo:
         print("\n")
         self.display_registers()
         print("\n")
+
+    def update_simulation_results(self):
+        o_string = self.return_adders_string() + self.return_multipliers_string() + self.return_loadbuffers_string() + self.return_registers_string()
+        self.output.append([self.clock_cycle, o_string])
     
         
 
@@ -1005,7 +1046,7 @@ registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
-tomasulo = Tomasulo(queue, 3, 3, 3, registers, opcodes, 1) 
-tomasulo.run_algorithim()
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) 
+results_table, simulation_results = tomasulo.run_algorithim()
 #tomasulo.run_algorithim2Wide()
 
