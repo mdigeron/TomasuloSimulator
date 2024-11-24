@@ -1092,6 +1092,7 @@ def generate_registers(num_registers):
 # TEST CODE
 # default latencies of 2 2 10 40 1 1
 random.seed(1)
+default_latencies = [2,2,10,40,1,1]
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
