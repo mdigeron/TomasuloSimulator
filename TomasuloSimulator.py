@@ -419,6 +419,7 @@ class Tomasulo:
         self.loadbuffers = {}
         self.registers = registers
         self.instruction_latency = {}
+        self.dispatch_size = int(dispatch_size)
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
         for esh in range(self.num_fp_mult):
@@ -817,13 +818,22 @@ class Tomasulo:
         
     def run_algorithim(self): # add verbose mode to determine what is displayed
         self.update_simulation_results()
-        while self.instruction_queue.is_empty() != True:
-            print("\n")
-            instruction = self.instruction_queue.soft_dequeue()
-            issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
-            if issued == False:
-                while issued == False:
-                    issued = self.issue_instruction(instruction)
+        if self.dispatch_size == 1:
+            while self.instruction_queue.is_empty() != True:
+                print("\n")
+                instruction = self.instruction_queue.soft_dequeue()
+                issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
+                if issued == False:
+                    while issued == False:
+                        issued = self.issue_instruction(instruction)
+                        self.write_back()
+                        self.execute_instructions()
+                        #self.write_back()
+                        self.increment_clock_cycle()
+                        self.update_utilizations()
+                        self.display_simulation()
+                        self.update_simulation_results()
+                else:
                     self.write_back()
                     self.execute_instructions()
                     #self.write_back()
@@ -831,7 +841,7 @@ class Tomasulo:
                     self.update_utilizations()
                     self.display_simulation()
                     self.update_simulation_results()
-            else:
+            while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
                 self.write_back()
                 self.execute_instructions()
                 #self.write_back()
@@ -839,17 +849,57 @@ class Tomasulo:
                 self.update_utilizations()
                 self.display_simulation()
                 self.update_simulation_results()
-        while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
-            self.write_back()
-            self.execute_instructions()
-            #self.write_back()
-            self.increment_clock_cycle()
-            self.update_utilizations()
-            self.display_simulation()
-            self.update_simulation_results()
-        print("\nRESULTS TABLE\n")
-        print(self.instruction_queue)
-        return self.instruction_queue, self.output
+            print("\nRESULTS TABLE\n")
+            print(self.instruction_queue)
+            return self.instruction_queue, self.output
+        elif self.dispatch_size == 2:
+            while self.instruction_queue.is_empty() != True:
+                print("\n")
+                instruction1 = self.instruction_queue.soft_dequeue()
+                issued1 = self.issue_instruction(instruction1) # boolean based on if instruction was issued
+                instruction2= self.instruction_queue.soft_dequeue()
+                issued2 = self.issue_instruction(instruction2)
+                if issued1 == False or issued2 == False:
+                    while issued1 == False:
+                        issued1 = self.issue_instruction(instruction1)
+                        self.write_back()
+                        self.execute_instructions()
+                        #self.write_back()
+                        self.increment_clock_cycle()
+                        self.update_utilizations()
+                        self.display_simulation()
+                        self.update_simulation_results()
+                    while issued2 == False:
+                        issued2 = self.issue_instruction(instruction2)
+                        self.write_back()
+                        self.execute_instructions()
+                        #self.write_back()
+                        self.increment_clock_cycle()
+                        self.update_utilizations()
+                        self.display_simulation()
+                        self.update_simulation_results()
+                else:
+                    self.write_back()
+                    self.execute_instructions()
+                    #self.write_back()
+                    self.increment_clock_cycle()
+                    self.update_utilizations()
+                    self.display_simulation()
+                    self.update_simulation_results()
+            while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
+                self.write_back()
+                self.execute_instructions()
+                #self.write_back()
+                self.increment_clock_cycle()
+                self.update_utilizations()
+                self.display_simulation()
+                self.update_simulation_results()
+            print("\nRESULTS TABLE\n")
+            print(self.instruction_queue)
+            return self.instruction_queue, self.output
+        else:
+            raise ValueError("Please make sure dispatch_size parameter in Tomalulo class variable is either 1 or 2")
+
 
     """
     def run_algorithm(self):  # Add verbose mode to determine what is displayed
