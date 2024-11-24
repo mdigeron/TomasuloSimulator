@@ -408,7 +408,7 @@ class Register:
         return(f"Register: {self.name} | Value: {self.value} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
 
 class Tomasulo:
-    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size):
+    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode):
         self.instruction_queue = instruction_queue
         self.num_fp_add = num_fp_add
         self.num_fp_mult = num_fp_mult
@@ -420,6 +420,7 @@ class Tomasulo:
         self.registers = registers
         self.instruction_latency = {}
         self.dispatch_size = int(dispatch_size)
+        self.verbose_mode = verbose_mode
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
         for esh in range(self.num_fp_mult):
@@ -495,7 +496,8 @@ class Tomasulo:
         if opcode == "ADDD" or opcode == "SUBD":
             for rs in self.fp_adders.values():
                 if rs.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand1.get_name() not in registers and operand2.get_name() not in registers:
-                    print("Avaliable Reservation Station " + rs.get_name())
+                    if self.verbose_mode == True:
+                        print("Avaliable Reservation Station " + rs.get_name())
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
                     if operand1.get_buffer() != None:
@@ -517,11 +519,13 @@ class Tomasulo:
                     rs.set_instruction_pointer(instruction)
                     rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     issued = True
-                    print("Issued: ", instruction)
+                    if self.verbose_mode == True:
+                        print("Issued: ", instruction)
         elif opcode == "MULTD" or opcode == "DIVD":
             for rs in self.fp_multipliers.values():
                 if rs.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand1.get_name() not in registers and operand2.get_name() not in registers:
-                    print("Avaliable Reservation Station " + rs.get_name())
+                    if self.verbose_mode == True:
+                        print("Avaliable Reservation Station " + rs.get_name())
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
                     if operand1.get_buffer() != None:
@@ -543,11 +547,13 @@ class Tomasulo:
                     rs.set_instruction_pointer(instruction)
                     rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     issued = True
-                    print("Issued: ", instruction)
+                    if self.verbose_mode == True:
+                        print("Issued: ", instruction)
         else: # opcode == "LDDD" or opcode == "STDD"
             for lb in self.loadbuffers.values():
                 if lb.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand2.get_name() not in registers:
-                    print("Avaliable Load/Store Buffer " + lb.get_name())
+                    if self.verbose_mode == True:
+                        print("Avaliable Load/Store Buffer " + lb.get_name())
                     lb.set_op(opcode)
                     lb.set_time(self.instruction_latency[opcode])
                     lb.set_address(str(operand1) + " " + operand2.get_name()) # check data types
@@ -565,8 +571,9 @@ class Tomasulo:
                     issued = True
                     lb.set_instruction_pointer(instruction)
                     lb.instruction_pointer.set_issued_cycle(self.clock_cycle)
-                    print("Issued: ", instruction)
-        if issued == False:
+                    if self.verbose_mode == True:
+                        print("Issued: ", instruction)
+        if issued == False and self.verbose_mode == True:
             print("No avalible Function Units this  clock cycle for Instruction: ", instruction)
         return issued # determine if instruction issued or not, if not issued need to be next instrucion instead of new front of queue
     
@@ -820,7 +827,8 @@ class Tomasulo:
         self.update_simulation_results()
         if self.dispatch_size == 1:
             while self.instruction_queue.is_empty() != True:
-                print("\n")
+                if self.verbose_mode == True:
+                    print("\n")
                 instruction = self.instruction_queue.soft_dequeue()
                 issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
                 if issued == False:
@@ -831,7 +839,8 @@ class Tomasulo:
                         #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
-                        self.display_simulation()
+                        if self.verbose_mode == True:
+                            self.display_simulation()
                         self.update_simulation_results()
                 else:
                     self.write_back()
@@ -839,7 +848,8 @@ class Tomasulo:
                     #self.write_back()
                     self.increment_clock_cycle()
                     self.update_utilizations()
-                    self.display_simulation()
+                    if self.verbose_mode == True:
+                        self.display_simulation()
                     self.update_simulation_results()
             while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
                 self.write_back()
@@ -847,14 +857,17 @@ class Tomasulo:
                 #self.write_back()
                 self.increment_clock_cycle()
                 self.update_utilizations()
-                self.display_simulation()
+                if self.verbose_mode == True:
+                    self.display_simulation()
                 self.update_simulation_results()
-            print("\nRESULTS TABLE\n")
-            print(self.instruction_queue)
+            if self.verbose_mode == True:
+                print("\nRESULTS TABLE\n")
+                print(self.instruction_queue)
             return self.instruction_queue, self.output
         elif self.dispatch_size == 2:
             while self.instruction_queue.is_empty() != True:
-                print("\n")
+                if self.verbose_mode == True:
+                    print("\n")
                 instruction1 = self.instruction_queue.soft_dequeue()
                 issued1 = self.issue_instruction(instruction1) # boolean based on if instruction was issued
                 instruction2= self.instruction_queue.soft_dequeue()
@@ -867,7 +880,8 @@ class Tomasulo:
                         #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
-                        self.display_simulation()
+                        if self.verbose_mode == True:
+                            self.display_simulation()
                         self.update_simulation_results()
                     while issued2 == False:
                         issued2 = self.issue_instruction(instruction2)
@@ -876,7 +890,8 @@ class Tomasulo:
                         #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
-                        self.display_simulation()
+                        if self.verbose_mode == True:
+                            self.display_simulation()
                         self.update_simulation_results()
                 else:
                     self.write_back()
@@ -884,7 +899,8 @@ class Tomasulo:
                     #self.write_back()
                     self.increment_clock_cycle()
                     self.update_utilizations()
-                    self.display_simulation()
+                    if self.verbose_mode == True:
+                        self.display_simulation()
                     self.update_simulation_results()
             while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
                 self.write_back()
@@ -892,10 +908,12 @@ class Tomasulo:
                 #self.write_back()
                 self.increment_clock_cycle()
                 self.update_utilizations()
-                self.display_simulation()
+                if self.verbose_mode == True:
+                    self.display_simulation()
                 self.update_simulation_results()
-            print("\nRESULTS TABLE\n")
-            print(self.instruction_queue)
+            if self.verbose_mode == True:
+                print("\nRESULTS TABLE\n")
+                print(self.instruction_queue)
             return self.instruction_queue, self.output # need to also return individual execution utilization values for plotting
         else:
             raise ValueError("Please make sure dispatch_size parameter in Tomalulo class variable is either 1 or 2")
@@ -965,7 +983,7 @@ default_latencies = [2,2,10,40,1,1]
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
-# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1) 
+# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True) 
 results_table, simulation_results = tomasulo.run_algorithim()
 
