@@ -1,5 +1,3 @@
-# https://github.com/bubblecounter/Tomasulo-Algorithm/blob/main/main.py
-# https://github.com/Zhannator/TomasuloAlgorithm
 # ADD DESCRIPTIVE COMMENTS
 # play around with different amounts of registers and calculate the utilization and plot results then optimize
 # write output to a file to 
@@ -680,7 +678,6 @@ class Tomasulo:
                 lb.instruction_pointer.set_issue_delay(False)
             if lb.get_busy_status() == True and lb.get_source_buffer() != None:
                 if self.registers[lb.get_source_buffer().get_name()].get_buffer() == None:
-                    # source and source buffer
                     lb.set_source(lb.get_source_buffer())
                     self.registers[lb.get_source_buffer().get_name()].set_buffer(lb)
                     lb.set_source_buffer(None)
@@ -828,7 +825,7 @@ class Tomasulo:
         return registers
         
         
-    def run_algorithim(self): # add verbose mode to determine what is displayed
+    def run_algorithim(self): 
         self.update_simulation_results()
         if self.dispatch_size == 1:
             while self.instruction_queue.is_empty() != True:
@@ -969,7 +966,7 @@ __builtins__.str = address_offset
 opcodes = ["ADDD", "SUBD", "MULTD", "DIVD", "LDDD", "STDD"]
 
 # include this function outside class to keep consistent instruction stream among multiple tomasulo simulator confirgurations for testing functional unit utilization
-def generate_instruction_queue(opcodes, registers, number_instructions): # need to add checks to make sure loads are done first also to change the addresses of loads (probably not anymore)
+def generate_instruction_queue(opcodes, registers, number_instructions): 
     instruction_queue = InstructionQueue()
     for esh in range(number_instructions):
         opcode = random.choice(opcodes)
@@ -991,7 +988,6 @@ def generate_registers(num_registers):
             registers["F" + str(esh)] = Register("F" + str(esh))
     return registers
 
-# output each clock cycle contents into a data structure to be able to print out any given clock cycle
 
 # TEST CODE
 # default latencies of 2 2 10 40 1 1
