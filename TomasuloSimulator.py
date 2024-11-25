@@ -863,7 +863,8 @@ class Tomasulo:
             if self.verbose_mode == True:
                 print("\nRESULTS TABLE\n")
                 print(self.instruction_queue)
-            return self.instruction_queue, self.output
+            utilizations = self.return_utilizations()
+            return self.instruction_queue, self.output, utilizations
         elif self.dispatch_size == 2:
             while self.instruction_queue.is_empty() != True:
                 if self.verbose_mode == True:
@@ -914,7 +915,8 @@ class Tomasulo:
             if self.verbose_mode == True:
                 print("\nRESULTS TABLE\n")
                 print(self.instruction_queue)
-            return self.instruction_queue, self.output # need to also return individual execution utilization values for plotting
+            utilizations = self.return_utilizations()
+            return self.instruction_queue, self.output, utilizations  
         else:
             raise ValueError("Please make sure dispatch_size parameter in Tomalulo class variable is either 1 or 2")
 
@@ -935,6 +937,16 @@ class Tomasulo:
     def update_simulation_results(self):
         o_string = self.return_adders_string() + self.return_multipliers_string() + self.return_loadbuffers_string() + self.return_registers_string()
         self.output.append([self.clock_cycle, o_string])
+
+    def return_utilizations(self):
+        utilizations = []
+        for rs in self.fp_adders.values():
+            utilizations.append([rs.get_name(), rs.busy_fraction, rs.executing_fraction])
+        for rs in self.fp_multipliers.values():
+            utilizations.append([rs.get_name(), rs.busy_fraction, rs.executing_fraction])
+        for lb in self.loadbuffers.values():
+            utilizations.append([lb.get_name(), lb.busy_fraction, lb.executing_fraction])
+        return utilizations
     
         
 
@@ -984,6 +996,7 @@ registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True) 
-results_table, simulation_results = tomasulo.run_algorithim()
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True)
+# results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
+results_table, simulation_results, rs_utilizations = tomasulo.run_algorithim()
 
