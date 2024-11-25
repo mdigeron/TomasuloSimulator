@@ -408,7 +408,7 @@ class Register:
         return(f"Register: {self.name} | Value: {self.value} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
 
 class Tomasulo:
-    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode):
+    def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies = None):
         self.instruction_queue = instruction_queue
         self.num_fp_add = num_fp_add
         self.num_fp_mult = num_fp_mult
@@ -421,6 +421,7 @@ class Tomasulo:
         self.instruction_latency = {}
         self.dispatch_size = int(dispatch_size)
         self.verbose_mode = verbose_mode
+        self.latencies = latencies
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
         for esh in range(self.num_fp_mult):
@@ -428,11 +429,15 @@ class Tomasulo:
         for esh in range(self.num_loadstore):
             self.loadbuffers["LOAD/STORE" + str(esh + 1)] = LoadBuffer("LOAD/STORE" + str(esh + 1))
         self.clock_cycle = 0
-        for opcode in opcodes:
-            latency = None
-            while type(latency) != type(1):
-                latency = int(input("Enter latency for " + opcode + ":"))
-            self.instruction_latency[opcode] = latency
+        if self.latencies == None:
+            for opcode in opcodes:
+                latency = None
+                while type(latency) != type(1):
+                    latency = int(input("Enter latency for " + opcode + ":"))
+                self.instruction_latency[opcode] = latency
+        else:
+            for opcode in opcodes:
+                self.instruction_latency[opcode] = self.latencies[opcode]
         self.output = []
         
     def increment_clock_cycle(self):
@@ -991,12 +996,12 @@ def generate_registers(num_registers):
 # TEST CODE
 # default latencies of 2 2 10 40 1 1
 random.seed(1)
-default_latencies = [2,2,10,40,1,1]
+default_latencies = {"ADDD": 2, "SUBD": 2, "MULTD": 10, "DIVD": 40, "LDDD": 1,"STDD": 1}
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
-# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True)
+# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True, latencies=default_latencies)
 # results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
 results_table, simulation_results, rs_utilizations = tomasulo.run_algorithim()
 
