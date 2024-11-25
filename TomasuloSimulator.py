@@ -2,7 +2,7 @@
 # play around with different amounts of registers and calculate the utilization and plot results then optimize
 # write output to a file to 
 class Instruction: 
-    def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=0, execute_start_cycle=0, execute_end_cycle=0, write_back_cycle=0): # possibly refactor into breaking up after passing i.e. instruction[0]...
+    def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=0, execute_start_cycle=0, execute_end_cycle=0, write_back_cycle=0):
         self.opcode = opcode
         self.destination = destination
         self.operand1 = operand1
