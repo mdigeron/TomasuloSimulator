@@ -996,7 +996,7 @@ default_latencies = {"ADDD": 2, "SUBD": 2, "MULTD": 10, "DIVD": 40, "LDDD": 1,"S
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 print(queue)
-# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies)
+# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True, latencies=default_latencies)
 # results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
 results_table, simulation_results, rs_utilizations = tomasulo.run_algorithim()
