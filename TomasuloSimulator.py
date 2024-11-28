@@ -375,26 +375,19 @@ class LoadBuffer:
         
 
 class Register:
-    def __init__(self, name, value=None, buffer=None):
+    def __init__(self, name, buffer=None):
         self.name = name
-        self.value = value
         self.buffer = buffer # should be a reservation station/ load buffer
         self.write_back = True
 
     def get_name(self):
         return self.name
 
-    def get_value(self):
-        return self.value
-
     def get_buffer(self):
         return self.buffer
 
     def get_write_back(self):
         return self.write_back
-
-    def set_value(self, value):
-        self.value = value
 
     def set_buffer(self, buffer):
         self.buffer = buffer
@@ -403,7 +396,7 @@ class Register:
         self.write_back = boolean
 
     def __str__(self):
-        return(f"Register: {self.name} | Value: {self.value} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
+        return(f"Register: {self.name} | Buffer Station: {self.buffer.get_name() if self.buffer != None else None}")
 
 class Tomasulo:
     def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies = None):
