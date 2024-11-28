@@ -404,7 +404,6 @@ class Tomasulo:
         self.num_fp_add = num_fp_add
         self.num_fp_mult = num_fp_mult
         self.num_loadstore = num_loadstore
-        self.dispatch_size = dispatch_size
         self.fp_adders = {}
         self.fp_multipliers = {}
         self.loadbuffers = {}
