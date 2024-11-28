@@ -830,7 +830,6 @@ class Tomasulo:
                         issued = self.issue_instruction(instruction)
                         self.write_back()
                         self.execute_instructions()
-                        #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
                         if self.verbose_mode == True:
@@ -839,7 +838,6 @@ class Tomasulo:
                 else:
                     self.write_back()
                     self.execute_instructions()
-                    #self.write_back()
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     if self.verbose_mode == True:
@@ -848,7 +846,6 @@ class Tomasulo:
             while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
                 self.write_back()
                 self.execute_instructions()
-                #self.write_back()
                 self.increment_clock_cycle()
                 self.update_utilizations()
                 if self.verbose_mode == True:
@@ -872,7 +869,6 @@ class Tomasulo:
                         issued1 = self.issue_instruction(instruction1)
                         self.write_back()
                         self.execute_instructions()
-                        #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
                         if self.verbose_mode == True:
@@ -882,7 +878,6 @@ class Tomasulo:
                         issued2 = self.issue_instruction(instruction2)
                         self.write_back()
                         self.execute_instructions()
-                        #self.write_back()
                         self.increment_clock_cycle()
                         self.update_utilizations()
                         if self.verbose_mode == True:
@@ -891,7 +886,6 @@ class Tomasulo:
                 else:
                     self.write_back()
                     self.execute_instructions()
-                    #self.write_back()
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     if self.verbose_mode == True:
@@ -900,7 +894,6 @@ class Tomasulo:
             while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
                 self.write_back()
                 self.execute_instructions()
-                #self.write_back()
                 self.increment_clock_cycle()
                 self.update_utilizations()
                 if self.verbose_mode == True:
