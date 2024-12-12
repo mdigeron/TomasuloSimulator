@@ -1,6 +1,3 @@
-# ADD DESCRIPTIVE COMMENTS
-# play around with different amounts of registers and calculate the utilization and plot results then optimize
-# write output to a file to 
 class Instruction: 
     def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=0, execute_start_cycle=0, execute_end_cycle=0, write_back_cycle=0):
         self.opcode = opcode
@@ -92,6 +89,7 @@ class InstructionQueue:
         self.head = None 
         self.tail = None
         self.length = 0
+        self.soft_length = 0
         self.pseudo_head = None
 
     ###########################################################
@@ -106,10 +104,10 @@ class InstructionQueue:
     #
     ###########################################################
     def is_empty(self):
-        return self.length == 0
+        return self.soft_length == 0
 
     def get_length(self):
-        return self.length
+        return self.soft_length
 
     ###########################################################
     #
@@ -142,6 +140,7 @@ class InstructionQueue:
             self.pseudo_head = new_instruction
             
         self.length += 1
+        self.soft_length +=1
 
     def dequeue(self): 
         if self.is_empty():
@@ -181,7 +180,7 @@ class InstructionQueue:
         
         instruction = self.pseudo_head
         self.pseudo_head = instruction.next
-        self.length -= 1 # length also needs to be controlled by soft_dequeue to mimic dequeue even though its not accurate
+        self.soft_length -= 1 # length also needs to be controlled by soft_dequeue to mimic dequeue even though its not accurate
         
         return instruction
     
@@ -190,13 +189,6 @@ class InstructionQueue:
         current = self.head
         while current:
             #instruction = []
-            """
-            instruction.append(current.opcode)
-            instruction.append(current.destination.get_name())
-            instruction.append(current.operand1.get_name())
-            instruction.append(current.operand2.get_name())
-            instructions.append(instruction)
-            """
             #instructions += current.opcode + " | "
             #              + current.destination.get_name() + " | "
             #              + current.operand1.get_name() + " | "
@@ -412,7 +404,7 @@ class Tomasulo:
         self.dispatch_size = int(dispatch_size)
         self.verbose_mode = verbose_mode
         self.latencies = latencies
-        self.parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length]
+        self.parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length, dispatch_size]
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
         for esh in range(self.num_fp_mult):
@@ -936,10 +928,12 @@ class Tomasulo:
             utilizations.append([lb.get_name(), lb.busy_fraction, lb.executing_fraction])
         return utilizations
 
- 
+
 import matplotlib.pyplot as plt
+import tkinter as tk
 import random
 import numpy as np
+import copy
 #https://stackoverflow.com/questions/4698493/can-i-add-custom-methods-attributes-to-built-in-python-types
 
 class address_offset(str):
@@ -971,25 +965,20 @@ def generate_registers(num_registers):
             registers["F" + str(esh)] = Register("F" + str(esh))
     return registers
 
-
-random.seed(1)
-default_latencies = {"ADDD": 2, "SUBD": 2, "MULTD": 10, "DIVD": 40, "LDDD": 1,"STDD": 1}
-registers = generate_registers(11)
-queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
-# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, False, latencies=default_latencies)
-# results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization], parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length]
-results_table, simulation_results, rs_utilizations, parameters = tomasulo.run_algorithim()
-
 def add_labels(bars): # adds exact values on top of each bar
     for bar in bars:
         value = bar.get_height()
         plt.text(bar.get_x() + bar.get_width() / 2, value, f'{value:.4f}', ha='center', va='bottom', fontsize=10)
 
 def plot_results(rs_utilizations, clock_cycles, parameters):
-    rs_name = [entry[0] for entry in rs_utilizations]
-    busy_utilization = [entry[1] for entry in rs_utilizations]
-    executing_utilization = [entry[2] for entry in rs_utilizations]
+    rs_name = [simulation[0] for simulation in rs_utilizations]
+    busy_utilization = [simulation[1] for simulation in rs_utilizations]
+    executing_utilization = [simulation[2] for simulation in rs_utilizations]
+    root = tk.Tk()
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.destroy()
+    plt.figure(figsize=(screen_width/100, screen_height/100))
     width = .5
     x = np.arange(len(rs_name))
     bar1= plt.bar(x - width / 2, busy_utilization, width, label='Busy Utilization', color='cyan')
@@ -997,12 +986,131 @@ def plot_results(rs_utilizations, clock_cycles, parameters):
     plt.xlabel('Function Unit Name')
     plt.ylabel('Utilizations')  
     plt.title('Utilizations per Function Unit')
-    plt.suptitle(f"Total Instructions: {parameters[4]} | Clock_Cycles: {clock_cycles} | Num_FP_Add: {parameters[0]} |  Num_FP_Mult: {parameters[1]} | Num_Load/Store: {parameters[2]} | Num_Registers: {parameters[3]}")
+    plt.suptitle(f"Total Instructions: {parameters[4]} | Clock_Cycles: {clock_cycles} | Num_FP_Add: {parameters[0]} |  Num_FP_Mult: {parameters[1]} | Num_Load/Store: {parameters[2]} | Num_Registers: {parameters[3]} | Dispatch_Size: {parameters[5]}")
     plt.xticks(x, rs_name)
     plt.grid()
     plt.legend()
     add_labels(bar1)
     add_labels(bar2)
     plt.show()
+    plt.close()
 
+random.seed(1)
+default_latencies = {"ADDD": 2, "SUBD": 2, "MULTD": 10, "DIVD": 40, "LDDD": 1,"STDD": 1}
+registers = generate_registers(11)
+registers32 = generate_registers(32)
+registers64 = generate_registers(64)
+registers128 = generate_registers(128)
+queue = generate_instruction_queue(opcodes, registers, 20)
+queue2 = copy.deepcopy(queue)
+queue3 = copy.deepcopy(queue)
+queue4 = copy.deepcopy(queue)
+queue5 = copy.deepcopy(queue)
+queue6 = copy.deepcopy(queue)
+queue7 = copy.deepcopy(queue)
+queue8 = copy.deepcopy(queue)
+queue9 = generate_instruction_queue(opcodes, registers, 100)
+queue10 = generate_instruction_queue(opcodes, registers, 1000)
+queue11 = generate_instruction_queue(opcodes, registers32, 1000)
+queue12 = generate_instruction_queue(opcodes, registers64, 1000)
+queue13 = generate_instruction_queue(opcodes, registers64, 10000)
+queue14 = generate_instruction_queue(opcodes, registers64, 10000)
+queue15 = generate_instruction_queue(opcodes, registers128, 100000)
+queue16 = copy.deepcopy(queue)
+# (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, False, latencies=default_latencies)
+# results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization], parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length]
+results_table, simulation_results, rs_utilizations, parameters = tomasulo.run_algorithim()
+print(f"Total Instructions: {parameters[4]} | Clock_Cycles: {simulation_results[-1][0]} | Num_FP_Add: {parameters[0]} |  Num_FP_Mult: {parameters[1]} | Num_Load/Store: {parameters[2]} | Num_Registers: {parameters[3]} | Dispatch_Size: {parameters[5]}\n")
+print(results_table)
 plot_results(rs_utilizations, simulation_results[-1][0], parameters)
+
+tomasulo16 = Tomasulo(queue16, 1, 1, 1, registers, opcodes, 1, False, latencies=default_latencies)
+results_table16, simulation_results16, rs_utilizations16, parameters16 = tomasulo16.run_algorithim()
+print(f"Total Instructions: {parameters16[4]} | Clock_Cycles: {simulation_results16[-1][0]} | Num_FP_Add: {parameters16[0]} |  Num_FP_Mult: {parameters16[1]} | Num_Load/Store: {parameters16[2]} | Num_Registers: {parameters16[3]} | Dispatch_Size: {parameters16[5]}\n")
+print(results_table16)
+plot_results(rs_utilizations16, simulation_results16[-1][0], parameters16)
+
+tomasulo2 = Tomasulo(queue2, 3, 4, 3, registers, opcodes, 1, False, latencies=default_latencies)
+results_table2, simulation_results2, rs_utilizations2, parameters2 = tomasulo2.run_algorithim()
+print(f"Total Instructions: {parameters2[4]} | Clock_Cycles: {simulation_results2[-1][0]} | Num_FP_Add: {parameters2[0]} |  Num_FP_Mult: {parameters2[1]} | Num_Load/Store: {parameters2[2]} | Num_Registers: {parameters2[3]} | Dispatch_Size: {parameters2[5]}\n")
+print(results_table2)
+plot_results(rs_utilizations2, simulation_results2[-1][0], parameters2)
+
+tomasulo3 = Tomasulo(queue3, 3, 8, 3, registers, opcodes, 1, False, latencies=default_latencies)
+results_table3, simulation_results3, rs_utilizations3, parameters3 = tomasulo3.run_algorithim()
+print(f"Total Instructions: {parameters3[4]} | Clock_Cycles: {simulation_results3[-1][0]} | Num_FP_Add: {parameters3[0]} |  Num_FP_Mult: {parameters3[1]} | Num_Load/Store: {parameters3[2]} | Num_Registers: {parameters3[3]} | Dispatch_Size: {parameters3[5]}\n")
+print(results_table3)
+plot_results(rs_utilizations3, simulation_results3[-1][0], parameters3)
+
+tomasulo4 = Tomasulo(queue4, 3, 16, 3, registers, opcodes, 1, False, latencies=default_latencies)
+results_table4, simulation_results4, rs_utilizations4, parameters4 = tomasulo4.run_algorithim()
+print(f"Total Instructions: {parameters4[4]} | Clock_Cycles: {simulation_results4[-1][0]} | Num_FP_Add: {parameters4[0]} |  Num_FP_Mult: {parameters4[1]} | Num_Load/Store: {parameters4[2]} | Num_Registers: {parameters4[3]} | Dispatch_Size: {parameters4[5]}\n")
+print(results_table4)
+plot_results(rs_utilizations4, simulation_results4[-1][0], parameters4)
+
+tomasulo5 = Tomasulo(queue5, 3, 2, 3, registers, opcodes, 2, False, latencies=default_latencies)
+results_table5, simulation_results5, rs_utilizations5, parameters5 = tomasulo5.run_algorithim()
+print(f"Total Instructions: {parameters5[4]} | Clock_Cycles: {simulation_results5[-1][0]} | Num_FP_Add: {parameters5[0]} |  Num_FP_Mult: {parameters5[1]} | Num_Load/Store: {parameters5[2]} | Num_Registers: {parameters5[3]} | Dispatch_Size: {parameters5[5]}\n")
+print(results_table5)
+plot_results(rs_utilizations5, simulation_results5[-1][0], parameters5)
+
+tomasulo6 = Tomasulo(queue6, 3, 4, 3, registers, opcodes, 2, False, latencies=default_latencies)
+results_table6, simulation_results6, rs_utilizations6, parameters6 = tomasulo6.run_algorithim()
+print(f"Total Instructions: {parameters6[4]} | Clock_Cycles: {simulation_results6[-1][0]} | Num_FP_Add: {parameters6[0]} |  Num_FP_Mult: {parameters6[1]} | Num_Load/Store: {parameters6[2]} | Num_Registers: {parameters6[3]} | Dispatch_Size: {parameters6[5]}\n")
+print(results_table6)
+plot_results(rs_utilizations6, simulation_results6[-1][0], parameters6)
+
+tomasulo7 = Tomasulo(queue7, 3, 8, 3, registers, opcodes, 2, False, latencies=default_latencies)
+results_table7, simulation_results7, rs_utilizations7, parameters7 = tomasulo7.run_algorithim()
+print(f"Total Instructions: {parameters7[4]} | Clock_Cycles: {simulation_results7[-1][0]} | Num_FP_Add: {parameters7[0]} |  Num_FP_Mult: {parameters7[1]} | Num_Load/Store: {parameters7[2]} | Num_Registers: {parameters7[3]} | Dispatch_Size: {parameters7[5]}\n")
+print(results_table7)
+plot_results(rs_utilizations7, simulation_results7[-1][0], parameters7)
+
+tomasulo8 = Tomasulo(queue8, 3, 16, 3, registers, opcodes, 2, False, latencies=default_latencies)
+results_table8, simulation_results8, rs_utilizations8, parameters8 = tomasulo8.run_algorithim()
+print(f"Total Instructions: {parameters8[4]} | Clock_Cycles: {simulation_results8[-1][0]} | Num_FP_Add: {parameters8[0]} |  Num_FP_Mult: {parameters8[1]} | Num_Load/Store: {parameters8[2]} | Num_Registers: {parameters8[3]} | Dispatch_Size: {parameters8[5]}\n")
+print(results_table8)
+plot_results(rs_utilizations8, simulation_results8[-1][0], parameters8)
+
+tomasulo9 = Tomasulo(queue9, 3, 8, 3, registers, opcodes, 1, False, latencies=default_latencies)
+results_table9, simulation_results9, rs_utilizations9, parameters9 = tomasulo9.run_algorithim()
+print(f"Total Instructions: {parameters9[4]} | Clock_Cycles: {simulation_results9[-1][0]} | Num_FP_Add: {parameters9[0]} |  Num_FP_Mult: {parameters9[1]} | Num_Load/Store: {parameters9[2]} | Num_Registers: {parameters9[3]} | Dispatch_Size: {parameters9[5]}\n")
+print(results_table9)
+plot_results(rs_utilizations9, simulation_results9[-1][0], parameters9)
+
+tomasulo10 = Tomasulo(queue10, 3, 8, 3, registers, opcodes, 1, False, latencies=default_latencies)
+results_table10, simulation_results10, rs_utilizations10, parameters10 = tomasulo10.run_algorithim()
+print(f"Total Instructions: {parameters10[4]} | Clock_Cycles: {simulation_results10[-1][0]} | Num_FP_Add: {parameters10[0]} |  Num_FP_Mult: {parameters10[1]} | Num_Load/Store: {parameters10[2]} | Num_Registers: {parameters10[3]} | Dispatch_Size: {parameters10[5]}\n")
+print(results_table10)
+plot_results(rs_utilizations10, simulation_results10[-1][0], parameters10)
+
+tomasulo11 = Tomasulo(queue11, 3, 8, 3, registers32, opcodes, 2, False, latencies=default_latencies)
+results_table11, simulation_results11, rs_utilizations11, parameters11 = tomasulo11.run_algorithim()
+print(f"Total Instructions: {parameters11[4]} | Clock_Cycles: {simulation_results11[-1][0]} | Num_FP_Add: {parameters11[0]} |  Num_FP_Mult: {parameters11[1]} | Num_Load/Store: {parameters11[2]} | Num_Registers: {parameters11[3]} | Dispatch_Size: {parameters11[5]}\n")
+print(results_table11)
+plot_results(rs_utilizations11, simulation_results11[-1][0], parameters11)
+
+tomasulo12 = Tomasulo(queue12, 3, 8, 3, registers64, opcodes, 1, False, latencies=default_latencies)
+results_table12, simulation_results12, rs_utilizations12, parameters12 = tomasulo12.run_algorithim()
+print(f"Total Instructions: {parameters12[4]} | Clock_Cycles: {simulation_results12[-1][0]} | Num_FP_Add: {parameters12[0]} |  Num_FP_Mult: {parameters12[1]} | Num_Load/Store: {parameters12[2]} | Num_Registers: {parameters12[3]} | Dispatch_Size: {parameters12[5]}\n")
+print(results_table12)
+plot_results(rs_utilizations12, simulation_results12[-1][0], parameters12)
+
+tomasulo13 = Tomasulo(queue13, 3, 32, 3, registers64, opcodes, 1, False, latencies=default_latencies)
+results_table13, simulation_results13, rs_utilizations13, parameters13 = tomasulo13.run_algorithim()
+print(f"Total Instructions: {parameters13[4]} | Clock_Cycles: {simulation_results13[-1][0]} | Num_FP_Add: {parameters13[0]} |  Num_FP_Mult: {parameters13[1]} | Num_Load/Store: {parameters13[2]} | Num_Registers: {parameters13[3]} | Dispatch_Size: {parameters13[5]}\n")
+print(results_table13)
+plot_results(rs_utilizations13, simulation_results13[-1][0], parameters13)
+
+tomasulo14 = Tomasulo(queue14, 3, 32, 3, registers64, opcodes, 2, False, latencies=default_latencies)
+results_table14, simulation_results14, rs_utilizations14, parameters14 = tomasulo14.run_algorithim()
+print(f"Total Instructions: {parameters14[4]} | Clock_Cycles: {simulation_results14[-1][0]} | Num_FP_Add: {parameters14[0]} |  Num_FP_Mult: {parameters14[1]} | Num_Load/Store: {parameters14[2]} | Num_Registers: {parameters14[3]} | Dispatch_Size: {parameters14[5]}\n")
+print(results_table14)
+plot_results(rs_utilizations14, simulation_results14[-1][0], parameters14)
+
+tomasulo15 = Tomasulo(queue15, 3, 32, 3, registers128, opcodes, 2, False, latencies=default_latencies)
+results_table15, simulation_results15, rs_utilizations15, parameters15 = tomasulo15.run_algorithim()
+print(f"Total Instructions: {parameters15[4]} | Clock_Cycles: {simulation_results15[-1][0]} | Num_FP_Add: {parameters15[0]} |  Num_FP_Mult: {parameters15[1]} | Num_Load/Store: {parameters15[2]} | Num_Registers: {parameters15[3]} | Dispatch_Size: {parameters15[5]}\n")
+print(results_table15)
+plot_results(rs_utilizations15, simulation_results15[-1][0], parameters15)
