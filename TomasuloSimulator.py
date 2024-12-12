@@ -938,6 +938,7 @@ class Tomasulo:
  
 import matplotlib.pyplot as plt
 import random
+import numpy as np
 #https://stackoverflow.com/questions/4698493/can-i-add-custom-methods-attributes-to-built-in-python-types
 
 class address_offset(str):
@@ -977,6 +978,29 @@ queue = generate_instruction_queue(opcodes, registers, 20) # change amount of in
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, False, latencies=default_latencies)
 # results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
-results_table, simulation_results, rs_utilizations = tomasulo.run_algorithim()
+results_table, simulation_results, rs_utilizations= tomasulo.run_algorithim()
 
+def add_labels(bars):
+    for bar in bars:
+        value = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2, value, f'{value:.4f}', ha='center', va='bottom', fontsize=10)
 
+def plot_results(rs_utilizations, clock_cycles):
+    rs_name = [entry[0] for entry in rs_utilizations]
+    busy_utilization = [entry[1] for entry in rs_utilizations]
+    executing_utilization = [entry[2] for entry in rs_utilizations]
+    width = .5
+    x = np.arange(len(rs_name))
+    bar1= plt.bar(x - width / 2, busy_utilization, width, label='Busy Utilization', color='cyan')
+    bar2= plt.bar(x + width / 2, executing_utilization, width, label='Executing Utilization', color='lime')
+    plt.xlabel('RS Name')
+    plt.ylabel('Utilizations')  
+    plt.title('Utilizations per RS')
+    plt.suptitle(f"Clock_cycles: {clock_cycles}")
+    plt.xticks(x, rs_name) 
+    plt.legend()
+    add_labels(bar1)
+    add_labels(bar2)
+    plt.show()
+
+plot_results(rs_utilizations, simulation_results[-1][0])
