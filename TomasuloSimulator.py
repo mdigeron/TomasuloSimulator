@@ -412,6 +412,7 @@ class Tomasulo:
         self.dispatch_size = int(dispatch_size)
         self.verbose_mode = verbose_mode
         self.latencies = latencies
+        self.parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length]
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
         for esh in range(self.num_fp_mult):
@@ -855,7 +856,7 @@ class Tomasulo:
                 print("\nRESULTS TABLE\n")
                 print(self.instruction_queue)
             utilizations = self.return_utilizations()
-            return self.instruction_queue, self.output, utilizations
+            return self.instruction_queue, self.output, utilizations, self.parameters
         elif self.dispatch_size == 2:
             while self.instruction_queue.is_empty() != True:
                 if self.verbose_mode == True:
@@ -903,7 +904,7 @@ class Tomasulo:
                 print("\nRESULTS TABLE\n")
                 print(self.instruction_queue)
             utilizations = self.return_utilizations()
-            return self.instruction_queue, self.output, utilizations  
+            return self.instruction_queue, self.output, utilizations, self.parameters  
         else:
             raise ValueError("Please make sure dispatch_size parameter in Tomalulo class variable is either 1 or 2")
 
@@ -977,15 +978,15 @@ registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
 tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, False, latencies=default_latencies)
-# results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
-results_table, simulation_results, rs_utilizations= tomasulo.run_algorithim()
+# results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization], parameters = [num_fp_add, num_fp_mult, num_loadstore, len(registers), instruction_queue.length]
+results_table, simulation_results, rs_utilizations, parameters = tomasulo.run_algorithim()
 
-def add_labels(bars):
+def add_labels(bars): # adds exact values on top of each bar
     for bar in bars:
         value = bar.get_height()
         plt.text(bar.get_x() + bar.get_width() / 2, value, f'{value:.4f}', ha='center', va='bottom', fontsize=10)
 
-def plot_results(rs_utilizations, clock_cycles):
+def plot_results(rs_utilizations, clock_cycles, parameters):
     rs_name = [entry[0] for entry in rs_utilizations]
     busy_utilization = [entry[1] for entry in rs_utilizations]
     executing_utilization = [entry[2] for entry in rs_utilizations]
@@ -993,14 +994,15 @@ def plot_results(rs_utilizations, clock_cycles):
     x = np.arange(len(rs_name))
     bar1= plt.bar(x - width / 2, busy_utilization, width, label='Busy Utilization', color='cyan')
     bar2= plt.bar(x + width / 2, executing_utilization, width, label='Executing Utilization', color='lime')
-    plt.xlabel('RS Name')
+    plt.xlabel('Function Unit Name')
     plt.ylabel('Utilizations')  
-    plt.title('Utilizations per RS')
-    plt.suptitle(f"Clock_cycles: {clock_cycles}")
-    plt.xticks(x, rs_name) 
+    plt.title('Utilizations per Function Unit')
+    plt.suptitle(f"Total Instructions: {parameters[4]} | Clock_Cycles: {clock_cycles} | Num_FP_Add: {parameters[0]} |  Num_FP_Mult: {parameters[1]} | Num_Load/Store: {parameters[2]} | Num_Registers: {parameters[3]}")
+    plt.xticks(x, rs_name)
+    plt.grid()
     plt.legend()
     add_labels(bar1)
     add_labels(bar2)
     plt.show()
 
-plot_results(rs_utilizations, simulation_results[-1][0])
+plot_results(rs_utilizations, simulation_results[-1][0], parameters)
