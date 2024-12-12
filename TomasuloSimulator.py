@@ -934,19 +934,15 @@ class Tomasulo:
         for lb in self.loadbuffers.values():
             utilizations.append([lb.get_name(), lb.busy_fraction, lb.executing_fraction])
         return utilizations
-    
-        
 
+ 
 import matplotlib.pyplot as plt
 import random
-import builtins
 #https://stackoverflow.com/questions/4698493/can-i-add-custom-methods-attributes-to-built-in-python-types
 
 class address_offset(str):
     def get_name(self):
         return self
-
-__builtins__.str = address_offset
 
 opcodes = ["ADDD", "SUBD", "MULTD", "DIVD", "LDDD", "STDD"]
 
@@ -963,7 +959,7 @@ def generate_instruction_queue(opcodes, registers, number_instructions):
         while operand2.get_name() == destination.get_name() or operand2.get_name() == operand1.get_name():
             operand2 = random.choice(list(registers.values()))
         if opcode == "LDDD" or opcode == "STDD":
-            operand1 = str(str(random.choice(range(65536))) + "+") # extra wrapper for address_offset datatype
+            operand1 = address_offset(str(random.choice(range(65536))) + "+") # extra wrapper for address_offset datatype
         instruction_queue.enqueue(opcode, destination, operand1, operand2)
     return instruction_queue
 
@@ -974,15 +970,13 @@ def generate_registers(num_registers):
     return registers
 
 
-# TEST CODE
-# default latencies of 2 2 10 40 1 1
 random.seed(1)
 default_latencies = {"ADDD": 2, "SUBD": 2, "MULTD": 10, "DIVD": 40, "LDDD": 1,"STDD": 1}
 registers = generate_registers(11)
 queue = generate_instruction_queue(opcodes, registers, 20) # change amount of instructions for different tests
-print(queue)
 # (instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes, dispatch_size, verbose_mode, latencies=None)
-tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, True, latencies=default_latencies)
+tomasulo = Tomasulo(queue, 3, 2, 3, registers, opcodes, 1, False, latencies=default_latencies)
 # results_table = [instruction_queue], simulation_results = [Clock_Cycle, RS and Register information], rs_utilizations = [RS name, busy_utilization, executing_utilization]
 results_table, simulation_results, rs_utilizations = tomasulo.run_algorithim()
+
 
