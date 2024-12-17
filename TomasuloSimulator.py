@@ -283,14 +283,12 @@ class InstructionQueue:
 ############################################################################
 # Class: ReservationStation
 #
-# TODO: Place class description here
-#
 # Purpose:
 #
 #   Reservation Stations are part of the Execution Unit. Instructions pulled
 #   from the Instruction Queue are loaded into one of several available
 #   Reservation Stations.
-
+#
 #   Instructions in a Reservation Station enter a 'waiting' state,
 #   where the instruction delays execution until all resources required for
 #   execution are obtained (for example, results to reach the register file,
@@ -299,36 +297,44 @@ class InstructionQueue:
 #   the instruction is dispatched to an appropriate execution unit
 #   (adder, multiplier, etc.).
 #
-# Underlying Implmentation:
-#   Singly Linked List
-#
-#   Note: The nodes are the instructions themselves,
-#         and each one holds a pointer to the next instruction.
-#
 # Private Data Members:
-#     
-#     time - amount of time an instruction will take to execute once dispatched.
-#     op   - instruction's opcode
+#
+#     String name     - Unique name of the ReservationStation
+#     int time        - amount of time (in clock-cycles) an instruction will take to execute once dispatched.
+#     String op       - instruction's opcode
 #     Register * vj   - First operand of the instruction in this reservation station.
 #                       If the reservation station is unoccupied, vj = None.
+#                       If the reservation station is occupied, then:
+#                           vj == None when the operand is located in a reservation station or load buffer
+#                           vj != None when the operand is located in a Register.
+#
 #     Register * qj   - First operand of the instruction in this reservation station.
 #                       If the reservation station is unoccupied, qj = None.
+#                       If the reservation station is occupied, then:
+#                           qj != None when the operand is located in a reservation station or load buffer
+#                           qj == None when the operand is located in a Register.
+#
 #     Register * vk   - Second operand of the instruction in this reservation station.
 #                       If the reservation station is unoccupied, vk = None.
+#                       If the reservation station is occupied, then:
+#                           vk == None when the operand is located in a reservation station or load buffer
+#                           vk != None when the operand is located in a Register.
+#
 #     Register * qk   - Second operand of the instruction in this reservation station.
 #                       If the reservation station is unoccupied, qk = None.
+#                       If the reservation station is occupied, then:
+#                           qk != None when the operand is located in a reservation station or load buffer
+#                           qk == None when the operand is located in a Register.
+#
 #     Register * source -
 #     Register * source_buffer -
-#     bool busy -
-#     int busy_cycles -
-#     int executing_cycles -
-#     float busy_fraction -
+#     bool busy - indicates if this ReservationStation is deployed with an instruction.
+#     int busy_cycles - number of clock cycles the ReservationStation has had the current instruction.
+#     int executing_cycles - number of clock cycles spent executing the instruction in this ReservationStation
+#     float busy_fraction - 
 #     float executing_fraction -
-#     Instruction * instruction_pointer - A handle to the instruction occupying
-#                                         this Reservation station, so that
-#                                         its start/end execution and
-#                                         write-back cycles can be modified.
-#                                        
+#     Instruction * instruction_pointer - A handle to the instruction occupying this Reservation station, so that
+#                                         its start/end execution and write-back cycles can be modified.
 #
 # Public Interface/Methods:
 #
@@ -422,6 +428,58 @@ class ReservationStation:
     def __str__(self):
         return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Source: {self.get_source().get_name() if self.get_source() != None else None} | Source Buffer: {self.get_source_buffer().get_name() if self.get_source_buffer() != None else None} | Vj: {self.vj.get_name()  if self.vj != None else None} | Vk: {self.vk.get_name() if self.vk != None else None} | Qj: {self.qj.get_name() if self.qj != None else None} | Qk: {self.qk.get_name() if self.qk != None else None}")
 
+##############################################################################################################
+# Class: LoadBuffer
+#
+# Purpose:
+#
+#   Load Buffers are part of the Execution Unit. Instructions pulled
+#   from the Instruction Queue are loaded into one of several available
+#   Load Buffers when a Load or Store operation needs to access Memory.
+#
+#   Instructions in a Load Buffer enter a 'waiting' state,
+#   where the instruction delays execution until all resources required for
+#   execution are obtained (for example, value to load from memory, register file availability,
+#   memory loads, or execution unit availability, etc...). Once an instruction
+#   and all of its required resources/data is deposited into a Load Buffer,
+#   the instruction is dispatched to the Memory Unit.
+#
+# Private Data Members:
+#
+#     String name - Unique name of the LoadBuffer
+#     String address - Memory location to Load value from or Store value into.
+#     time - amount of time an instruction will take to execute once dispatched.
+#     op   - instruction's opcode
+#     Register * source   - First operand of the instruction in this load buffer.
+#                           If the load buffer is unoccupied, vj = None.
+#                           If the load buffer is occupied, then:
+#                             vj == None when the operand is located in a reservation station or load buffer
+#                             vj != None when the operand is located in a Register.
+#
+#     Register * source_buffer  - First operand of the instruction in this load buffer.
+#                                  If the load buffer is unoccupied, qj = None.
+#                                  If the load buffer is occupied, then:
+#                                    qj != None when the operand is located in a reservation station or load buffer
+#                                    qj == None when the operand is located in a Register.
+
+#     bool busy - indicates if this LoadBuffer is deployed with an instruction.
+#     int busy_cycles - number of clock cycles the LoadBuffer has had the current instruction.
+#     int executing_cycles - number of clock cycles spent executing the instruction in this LoadBuffer
+#     float busy_fraction - 
+#     float executing_fraction -
+#     Instruction * instruction_pointer - A handle to the instruction occupying this load buffer, so that
+#                                         its start/end execution and write-back cycles can be modified.
+#
+# Public Interface/Methods:
+#     __init__ - Constructs a new LoadBuffer
+#     __str__  - Outputs LoadBuffer content as a string
+#
+#     Accessor Methods:
+#       RO (get_X):       name
+#       RW ({get|set}_X): busy_status, address, op, time, vj, qj,
+#                         source, source_buffer, instruction_pointer
+#
+##############################################################################################################
 class LoadBuffer:
     def __init__(self, name, time=None, vj=None, qj=None, address=None, busy=False, instruction_pointer=None):
         self.name = name
@@ -499,7 +557,35 @@ class LoadBuffer:
     def __str__(self):
         return (f"Clock Cycles Remaining: {self.time} | Name: {self.name} | Busy: {self.busy} | Op: {self.op} | Source: {self.get_source().get_name() if self.get_source() != None else None} | Source Buffer: {self.get_source_buffer().get_name() if self.get_source_buffer() != None else None} | Address: {self.address}")
         
-
+##############################################################################################################
+# Class: Register
+#
+# Purpose:
+#
+#   An Instruction has to use Register values as operands, and in Out-of-Order execution, those Registers
+#   may have different values at various points in time. In order to get the correct value of the Register
+#   that is relevant for a given instruction, the Register class describes the location of the correct value:
+#   the value is either in the register itself within the register file, or is in a buffer (load buffer and
+#   reservation station). Instructions can use this information to keep tabs on the values that are
+#   relevant to them and therefore respects data dependencies in the program.
+#
+# Private Data Members:
+#
+#     String name     - Unique name of the Register
+#     Buffer * buffer - Location of the relevant value for this register.
+#                       If this is set to None, then it implies that the relevant
+#                       value is in the Register file.
+#     bool write_back - 
+#
+# Public Interface/Methods:
+#     __init__ - Constructs a new Register
+#     __str__  - Outputs Register content as a string
+#
+#     Accessor Methods:
+#       RO (get_X):       name
+#       RW ({get|set}_X): buffer, write_back
+#
+##############################################################################################################
 class Register:
     def __init__(self, name, buffer=None):
         self.name = name
