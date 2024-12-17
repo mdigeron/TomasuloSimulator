@@ -326,13 +326,23 @@ class InstructionQueue:
 #                           qk != None when the operand is located in a reservation station or load buffer
 #                           qk == None when the operand is located in a Register.
 #
-#     Register * source -
-#     Register * source_buffer -
+#     Register * source - Destination operand of the instruction in this reservation station.
+#                         If the reservation station is unoccupied, source_buffer = None.
+#                         If the reservation station is occupied, then:
+#                           source != None when the operand is located in a reservation station or load buffer
+#                           source == None when the operand is located in a Register.
+
+#     Register * source_buffer - Destination operand of the instruction in this reservation station.
+#                                If the reservation station is unoccupied, source_buffer = None.
+#                                If the reservation station is occupied, then:
+#                                  source_buffer != None when the operand is located in a reservation station or load buffer
+#                                  source_buffer == None when the operand is located in a Register.
+
 #     bool busy - indicates if this ReservationStation is deployed with an instruction.
 #     int busy_cycles - number of clock cycles the ReservationStation has had the current instruction.
 #     int executing_cycles - number of clock cycles spent executing the instruction in this ReservationStation
-#     float busy_fraction - 
-#     float executing_fraction -
+#     float busy_fraction - fraction of entire program that the given instruction was in a ReservationStation
+#     float executing_fraction - fraction of entire program that the given instruction was executing.
 #     Instruction * instruction_pointer - A handle to the instruction occupying this Reservation station, so that
 #                                         its start/end execution and write-back cycles can be modified.
 #
@@ -447,7 +457,7 @@ class ReservationStation:
 # Private Data Members:
 #
 #     String name - Unique name of the LoadBuffer
-#     String address - Memory location to Load value from or Store value into.
+#     uint16 address - Memory location to Load value from or Store value into.
 #     time - amount of time an instruction will take to execute once dispatched.
 #     op   - instruction's opcode
 #     Register * source   - First operand of the instruction in this load buffer.
@@ -575,7 +585,7 @@ class LoadBuffer:
 #     Buffer * buffer - Location of the relevant value for this register.
 #                       If this is set to None, then it implies that the relevant
 #                       value is in the Register file.
-#     bool write_back - 
+#     bool write_back - flag to indicate that a register 
 #
 # Public Interface/Methods:
 #     __init__ - Constructs a new Register
@@ -724,8 +734,6 @@ class Tomasulo:
     #
     # Tomasulo Scheduling Algorithm for issuing instructions to the Execution Unit
     #
-    #
-    #
     ###############################################################################
     def issue_instruction(self, instruction):
         issued = False
@@ -733,7 +741,8 @@ class Tomasulo:
         destination = instruction.get_destination()
         operand1 = instruction.get_operand1()
         operand2 = instruction.get_operand2()
-        
+
+        # Get a list of the registers whose values are currently tied to buffers
         registers = self.buffer_registers()
 
         ################################################################
@@ -741,18 +750,21 @@ class Tomasulo:
         ################################################################
         if opcode == "ADDD" or opcode == "SUBD":
             for rs in self.fp_adders.values():
+                
                 #####################################################################
                 # Issue instruction to Adder Reservation station when all
                 # the following conditions are satisfied:
                 #
-                # * ReservationStation isn't busy
+                # * The ReservationStation isn't busy
                 # * The instruction hasn't already been issued.
-                # * The instruction's operands 
-                # if it's available and the instruction hasn't already been issued.
+                # * None of the instruction's register operands are currently being
+                #   waited for in the Reservation Stations and Load Buffers
+                # 
                 #####################################################################
                 if rs.get_busy_status() == False and issued == False and destination.get_name() not in registers and operand1.get_name() not in registers and operand2.get_name() not in registers:
                     if self.verbose_mode == True:
                         print("Avaliable Reservation Station " + rs.get_name())
+                        
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
 
@@ -772,8 +784,7 @@ class Tomasulo:
                     # Otherwise, set the vX parameter to
                     # the current value of the register,
                     # and then update the latest location of the
-                    # register to this Reservation Station in the
-                    # Register Alias Table.
+                    # register to this Reservation Station.
                     #
                     ################################################
                     if operand1.get_buffer() != None:
@@ -928,24 +939,28 @@ class Tomasulo:
                         rs.get_vj().set_write_back(True)
                     if rs.get_source().get_write_back() == False:
                         rs.get_source().set_write_back(True)
+                        
             if rs.get_busy_status() == True and rs.get_qj() != None:
                 if self.registers[rs.get_qj().get_name()].get_buffer() == None:
                     rs.set_vj(rs.get_qj())
                     self.registers[rs.get_vj().get_name()].set_buffer(rs)
                     rs.set_qj(None)
                 rs.instruction_pointer.set_issue_delay(False)
+                
             if rs.get_busy_status() == True and rs.get_qk() != None:
                 if self.registers[rs.get_qk().get_name()].get_buffer() == None:
                     rs.set_vk(rs.get_qk())
                     self.registers[rs.get_vk().get_name()].set_buffer(rs)
                     rs.set_qk(None)
                 rs.instruction_pointer.set_issue_delay(False)
+                
             if rs.get_busy_status() == True and rs.get_source_buffer() != None:
                 if self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
                     rs.set_source(rs.get_source_buffer())
                     self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
                     rs.set_source_buffer(None)
                 rs.instruction_pointer.set_issue_delay(False)
+                
             if rs.get_busy_status() == True:
                     rs.busy_cycles += 1
 
@@ -1136,6 +1151,7 @@ class Tomasulo:
                 registers.append(rs.get_qk().get_name())
             if rs.get_source_buffer() != None:
                 registers.append(rs.get_source_buffer().get_name())
+                
         for rs in self.fp_multipliers.values():
             if rs.get_qj() != None:
                 registers.append(rs.get_qj().get_name())
@@ -1143,6 +1159,7 @@ class Tomasulo:
                 registers.append(rs.get_qk().get_name())
             if rs.get_source_buffer() != None:
                 registers.append(rs.get_source_buffer().get_name())
+                
         for lb in self.loadbuffers.values():
             if lb.get_qj() != None:
                 registers.append(lb.get_qj().get_name())
