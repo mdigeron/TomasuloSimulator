@@ -3,7 +3,52 @@
 # ADD DESCRIPTIVE COMMENTS
 # play around with different amounts of registers and calculate the utilization and plot results then optimize
 # NEED TO ADD MORE DATA STRUCTURES, linked list connections for registers?
-# write output to a file to 
+# write output to a file to
+
+
+#################################################################################################################
+# Class: Instruction
+#
+# This class contains the core information for each instruction - the opcode,
+# operands, and destination. Additionally, book-keeping information is
+# recorded within the instruction for the Tomasulo algorithm and performance
+# measurement.
+#
+# Purpose:
+#
+#   Instructions are fetched and placed into the InstructionQueue. They are
+# issued to the execution unit when the Tomasulo Algorithm determines that
+# there are free resources to execute the instruction and when all the
+# operands and destination of the instruction are ready.
+#
+# Underlying Implmentation:
+#   Node of a Singly Linked List
+#
+#   Note: Each instruction holds a pointer to the next instruction.
+#
+# Private Data Members:
+#     String opcode           - pointer to the first instruction in the queue.
+#     Register * destination  - Points to the register where the result of the instruction will be written.
+#     Register * operand1     - Points to the register that contains the
+#                               first operand of the instruction.
+#     Register * operand2     - Points to the register that contains the
+#                               second operand of the instruction.
+#     Instruction * next      - Points to the next instruction in the linked list.
+#     int issued_cycle        - Marks the cycle when this instruction was issued.
+#     int execute_start_cycle - Timestamp (in clock-cycles) when instruction started executing.
+#     int execute_end_cycle   - Timestamp (in clock-cycles) when instruction finished executing.
+#     int write_back_cycle    - Timestamp (in clock-cycles) when instruction result was written to destination.
+#
+# Public Interface/Methods:
+#     __init__ - Constructs a new instruction
+#     __str__  - Outputs instruction content as a string
+#
+#     Accessor Methods:
+#       RO (get_X):       opcode, destination, operand1, operand2
+#       RW ({get|set}_X): issued_cycle, execute_start_cycle, write_back_cycle
+#       WO (set_X):       issue_delay
+#
+#####################################################################################################################
 class Instruction: # add cycle amount? when use issue exec and write?
     def __init__(self, opcode, destination, operand1, operand2, next=None, issued_cycle=0, execute_start_cycle=0, execute_end_cycle=0, write_back_cycle=0): # possibly refactor into breaking up after passing i.e. instruction[0]...
         self.opcode = opcode
@@ -65,6 +110,15 @@ class Instruction: # add cycle amount? when use issue exec and write?
 # This class creates and removes instructions through the enqueue/dequeue
 # operations specified in the InstructionQueue public interface.
 #
+# Purpose:
+#
+#   The processor's instruction fetch unit will retrieve instructions from
+#   memory and load each instruction into the instruction queue. It is from
+#   this queue that instructions are introduced to the system and
+#   are then dispatched to relevant portions of the Tomasulo sub-system.
+#   Basic information required to run a given instruction are saved into the
+#   queue; that same information is used later on to make scheduling decisions.
+#
 # Underlying Implmentation:
 #   Singly Linked List
 #
@@ -90,12 +144,37 @@ class Instruction: # add cycle amount? when use issue exec and write?
 # __init__, __str__, is_empty, get_length, enqueue, dequeue, soft_dequeue
 #
 ############################################################################
-class InstructionQueue: 
+class InstructionQueue:
     def __init__(self):
         self.head = None 
         self.tail = None
         self.length = 0
         self.pseudo_head = None
+
+    
+    def __str__(self):
+        instructions = "" # refactor to do without list like in hw2
+        current = self.head
+        while current:
+            #instruction = []
+            """
+            instruction.append(current.opcode)
+            instruction.append(current.destination.get_name())
+            instruction.append(current.operand1.get_name())
+            instruction.append(current.operand2.get_name())
+            instructions.append(instruction)
+            """
+            #instructions += current.opcode + " | "
+            #              + current.destination.get_name() + " | "
+            #              + current.operand1.get_name() + " | "
+            #              + current.operand2.get_name() + " | "
+            #              + str(current.get_issued_cycle()) + " | "
+            #              + str(current.get_execute_start_cycle()) + " | "
+            #              + str(current.get_execute_end_cycle()) + " | "
+            #              + str(current.get_write_back_cycle()) + "\n"
+            instructions += str(current) + "\n"
+            current = current.next
+        return instructions
 
     ###########################################################
     # InstructionQueue State/Status Methods
@@ -119,8 +198,8 @@ class InstructionQueue:
     # Method: enqueue
     #
     # Creates a new Instruction and inserts it at the end of
-    # the queue or at the head of the queue when the
-    # InstructionQueue is empty.
+    # the queue (which would be the head of the queue when the
+    # InstructionQueue is empty.)
     #
     # Parameters:
     #     InstructionQueue * self
@@ -131,18 +210,25 @@ class InstructionQueue:
     #
     # Returns: Does not return anything.
     #
+    # Complexity: Constant - O(1)
+    #   It will always take a maximum of 2 to 3 operations
+    #   to queue an instruction.
+    #   (i.e., set the head, tail, and length)
+    #
     ###########################################################
     def enqueue(self, opcode, destination, operand1, operand2):
         new_instruction = Instruction(opcode, destination, operand1, operand2)
-        
-        if self.tail is not None:
+
+        # If the queue already has instructions, set the 'next' pointer of
+        # the last instruction in the queue to this new instruction.
+        if self.tail is not None: 
             self.tail.next = new_instruction
             
         self.tail = new_instruction
         
         if self.head is None:
             self.head = new_instruction
-            self.pseudo_head = new_instruction
+            self.pseudo_head = new_instruction   # Investigate the usage of this pseudo_head
             
         self.length += 1
 
@@ -150,6 +236,28 @@ class InstructionQueue:
     # the instruction, just move a seperate pointer so we can
     # access the instruction information such as when it was
     # executed, written etc (soft_dequeue?)
+
+    ###########################################################
+    #
+    # Method: dequeue
+    #
+    #     Shifts out the instruction waiting at the front of the
+    # queue and then points the 'pseudo_head' to the next
+    # instruction in the queue. Old instructions are retained
+    # until explicity flushed, so that instruction history can
+    # be used for later analysis and scheduling decisions.
+    #
+    # Parameters:
+    #     InstructionQueue * self
+    #
+    # Returns: Instruction at the front of the queue or 'None'.
+    #
+    # Complexity: Constant - O(1)
+    #   It will always take a maximum of 2 to 3 operations
+    #   to dequeue an instruction.
+    #   (i.e., set the head, tail, and length)
+    #
+    ###########################################################
     def dequeue(self): 
         if self.is_empty():
             return "Instruction queue is empty"
@@ -192,30 +300,61 @@ class InstructionQueue:
         
         return instruction
     
-    def __str__(self):
-        instructions = "" # refactor to do without list like in hw2
-        current = self.head
-        while current:
-            #instruction = []
-            """
-            instruction.append(current.opcode)
-            instruction.append(current.destination.get_name())
-            instruction.append(current.operand1.get_name())
-            instruction.append(current.operand2.get_name())
-            instructions.append(instruction)
-            """
-            #instructions += current.opcode + " | "
-            #              + current.destination.get_name() + " | "
-            #              + current.operand1.get_name() + " | "
-            #              + current.operand2.get_name() + " | "
-            #              + str(current.get_issued_cycle()) + " | "
-            #              + str(current.get_execute_start_cycle()) + " | "
-            #              + str(current.get_execute_end_cycle()) + " | "
-            #              + str(current.get_write_back_cycle()) + "\n"
-            instructions += str(current) + "\n"
-            current = current.next
-        return instructions
+############################################################################
+# Class: ReservationStation
+#
+# TODO: Place class description here
+#
+# Purpose:
+#
+#   Reservation Stations are part of the Execution Unit. Instructions pulled
+#   from the Instruction Queue are loaded into one of several available
+#   Reservation Stations.
 
+#   Instructions in a Reservation Station enter a 'waiting' state,
+#   where the instruction delays execution until all resources required for
+#   execution are obtained (for example, results to reach the register file,
+#   memory loads, or execution unit availability, etc...). Once an instruction
+#   and all of its required resources/data is deposited into a Reservation Station,
+#   the instruction is dispatched to an appropriate execution unit
+#   (adder, multiplier, etc.).
+#
+# Underlying Implmentation:
+#   Singly Linked List
+#
+#   Note: The nodes are the instructions themselves,
+#         and each one holds a pointer to the next instruction.
+#
+# Private Data Members:
+#     
+#     time - amount of time an instruction will take to execute once dispatched.
+#     op   - instruction's opcode
+#     Register * vj   - First operand of the instruction in this reservation station.
+#                       If the reservation station is unoccupied, vj = None.
+#     Register * qj   - First operand of the instruction in this reservation station.
+#                       If the reservation station is unoccupied, qj = None.
+#     Register * vk   - Second operand of the instruction in this reservation station.
+#                       If the reservation station is unoccupied, vk = None.
+#     Register * qk   - Second operand of the instruction in this reservation station.
+#                       If the reservation station is unoccupied, qk = None.
+#     Register * source -
+#     Register * source_buffer -
+#     bool busy -
+#     int busy_cycles -
+#     int executing_cycles -
+#     float busy_fraction -
+#     float executing_fraction -
+#     Instruction * instruction_pointer - A handle to the instruction occupying
+#                                         this Reservation station, so that
+#                                         its start/end execution and
+#                                         write-back cycles can be modified.
+#                                        
+#
+# Public Interface/Methods:
+#
+# __init__, 
+#
+#######################################################################################
 class ReservationStation:
     def __init__(self, name, time=None, op=None, vj=None, vk=None, qj=None, qk=None, busy=False, source=None, instruction_pointer=None):
         self.name = name
@@ -413,33 +552,58 @@ class Register:
 
 class Tomasulo:
     def __init__(self, instruction_queue, num_fp_add, num_fp_mult, num_loadstore, registers, opcodes):
+
+        ####################################################################
+        # Initialize the instruction queue for incoming instructions
+        ####################################################################
         self.instruction_queue = instruction_queue
+
+        ####################################################################
+        # Initialize the functional unit buffers within the Execution Unit.
+        ####################################################################
         self.num_fp_add = num_fp_add
         self.num_fp_mult = num_fp_mult
         self.num_loadstore = num_loadstore
-        #self.num_registers = num_registers
+
         self.fp_adders = {}
         self.fp_multipliers = {}
         self.loadbuffers = {}
-        #self.registers = {} move outside for now
-        self.registers = registers
-        self.instruction_latency = {}
+
         for esh in range(self.num_fp_add):
             self.fp_adders["ADD" + str(esh + 1)] = ReservationStation("ADD" + str(esh + 1))
+            
         for esh in range(self.num_fp_mult):
             self.fp_multipliers["MULT" + str(esh + 1)] = ReservationStation("MULT" + str(esh + 1))
+            
         for esh in range(self.num_loadstore):
             self.loadbuffers["LOAD" + str(esh + 1)] = LoadBuffer("LOAD" + str(esh + 1))
+
+        ##################################################################
+        # Initialize the Register Alias Table (RAT) for Register renaming
+        ##################################################################
+        self.registers = registers
         """
         for esh in range(self.num_registers):
             self.registers["F" + str(esh)] = Register("F" + str(esh))
         """
+
+        ###########################################
+        # Initialize the starting Clock Cycle to 0
+        ###########################################
         self.clock_cycle = 0
+
+        ###########################################################################################
+        # Obtain the execution time/latency (in clock-cycles) for each instruction from the user
+        ###########################################################################################
+        self.instruction_latency = {}
+        
         for opcode in opcodes:
             latency = None
             while type(latency) != type(1):
                 latency = int(input("Enter latency for " + opcode + ":"))
             self.instruction_latency[opcode] = latency
+
+            
         self.table = None # possible data structure for displaying instruction and write information
         
     def increment_clock_cycle(self):
@@ -447,6 +611,12 @@ class Tomasulo:
 
     def get_clock_cycle(self):
         return self.clock_cycle
+
+    #######################################################################
+    #
+    # Methods to Display the internal state of the Execution Unit and RAT
+    #
+    #######################################################################
 
     def display_adders(self): # make formatting look better
         for name, rs in self.fp_adders.items():
@@ -464,43 +634,84 @@ class Tomasulo:
         for register in self.registers.values():
             print(register)
 
-
+    ###############################################################################
+    #
+    # Tomasulo Scheduling Algorithm for issuing instructions to the Execution Unit
+    #
+    #
+    #
+    ###############################################################################
     def issue_instruction(self, instruction):
         issued = False
         opcode = instruction.get_opcode()
         destination = instruction.get_destination()
         operand1 = instruction.get_operand1()
         operand2 = instruction.get_operand2()
-        #print(operand1)
-        #print(operand2)
+
+        ################################################################
+        # Handling Instructions requiring the Adder Functional Unit
+        ################################################################
         if opcode == "ADDD" or opcode == "SUBD":
+            
             for rs in self.fp_adders.values():
+                #####################################################################
+                # Issue instruction to Adder Reservation station
+                # if it's available and the instruction hasn't already been issued.
+                #####################################################################
                 if rs.get_busy_status() == False and issued == False:
                     print("Avaliable Reservation Station " + rs.get_name())
+                    
                     rs.set_op(opcode)
                     rs.set_time(self.instruction_latency[opcode])
-                    # need to figure out how to check j,k values and checking if busy
+                    
+                    ################################################
+                    # Rename Instruction's Registers
+                    #
+                    # Note: Need to figure out how to
+                    #       check j,k value and if they
+                    #       they are busy.
+                    #
+                    # If the operand's value depends on the result
+                    # of another station that hasn't completed yet
+                    # (operandX.get_buffer() != None), then set
+                    # the Reservation Station's qX parameter to
+                    # the buffer it is waiting for.
+                    #
+                    # Otherwise, set the vX parameter to
+                    # the current value of the register,
+                    # and then update the latest location of the
+                    # register to this Reservation Station in the
+                    # Register Alias Table.
+                    #
+                    ################################################
                     if operand1.get_buffer() != None:
                         rs.set_qj(operand1)
-                    else:
+                    else: 
                         rs.set_vj(operand1)
                         self.registers[operand1.get_name()].set_buffer(rs)
+                        
                     if operand2.get_buffer() != None:
                         rs.set_qk(operand2)
                     else:
                         rs.set_vk(operand2)
                         self.registers[operand2.get_name()].set_buffer(rs)
+                        
                     if destination.get_buffer() != None:
                         rs.set_source_buffer(destination)
                     else:
                         rs.set_source(destination)
                         self.registers[destination.get_name()].set_buffer(rs)
+                        
                     rs.set_busy_status(True)
                     rs.set_instruction_pointer(instruction)
                     rs.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     issued = True
                     #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
+                    
+        ################################################################
+        # Handling Instructions requiring the Multiplier Functional Unit
+        ################################################################
         elif opcode == "MULTD" or opcode == "DIVD":
             for rs in self.fp_multipliers.values():
                 if rs.get_busy_status() == False and issued == False:
@@ -528,6 +739,10 @@ class Tomasulo:
                     issued = True
                     #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
+                    
+        ################################################################
+        # Handling Instructions requiring the Memory Interface
+        ################################################################
         else: # opcode == "LDDD"
             for lb in self.loadbuffers.values():
                 if lb.get_busy_status() == False and issued == False:
@@ -550,13 +765,21 @@ class Tomasulo:
                     lb.instruction_pointer.set_issued_cycle(self.clock_cycle)
                     #instruction.set_issued_cycle(self.clock_cycle)
                     print("Issued: ", instruction)
+
+        #########################################################################
+        # Stall Instruction Issuance if there were no available function units
+        #########################################################################
         if issued == False:
-            print("No avalible Function Units this  clock cycle for Instruction: ", instruction)
+            print("No availible Function Units this clock cycle for Instruction: ", instruction)
+            
         return issued # determine if instruction issued or not, if not issued need to be next instrucion instead of new front of queue
         # maybe for instructions not able to be issued yet, make a seperate call stack or linked list structure to check which one should be issued next 
 
 
     def execute_instructions(self): # NEED TO MOVE LOGIC TO EXECUTE INSTRUCTION SO AFTER INSTRUCTION QUEUE IS EMPTY EXECUTION CONTINUES/move q to v when ready
+        ######################################
+        # Run Execution Cycle for the Adders
+        ######################################
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
                 if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
@@ -601,6 +824,10 @@ class Tomasulo:
             if rs.get_busy_status() == True:
                 rs.busy_cycles += 1
                 # comment lines for testing
+
+        ###########################################
+        # Run Execution Cycle for the Multipliers
+        ###########################################
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_qj() == None and rs.get_qk() == None and rs.get_source_buffer() == None:
                 if rs.instruction_pointer.issue_delay == False and rs.get_vk().get_write_back() == True and rs.get_vj().get_write_back() == True and rs.get_source().get_write_back() == True:
@@ -645,6 +872,10 @@ class Tomasulo:
                 rs.instruction_pointer.set_issue_delay(False)
             if rs.get_busy_status() == True:
                     rs.busy_cycles += 1
+
+        ################################################
+        # Run Execution Cycle for the Memory Interface
+        ################################################
         for lb in self.loadbuffers.values():
             if lb.get_busy_status() == True and lb.get_qj() == None and lb.get_source_buffer() == None:
                 if lb.instruction_pointer.issue_delay == False and lb.get_vj().get_write_back() == True and lb.get_source().get_write_back() == True: # NOT GETTING IN HERE
@@ -677,13 +908,22 @@ class Tomasulo:
             if lb.get_busy_status() == True:
                 lb.busy_cycles += 1
      
-
-    def write_back(self): # infinite loop caused because instruction is issued before qj/qk given to what needs it so make a check here to send it backon clock cycle 87
+    #############################################################
+    # Write-Back Execution Results and clear stations/buffers
+    #
+    # Note: infinite loop caused because instruction is issued
+    #       before qj/qk given to what needs it so make a check
+    #       here to send it back on clock cycle 87
+    #############################################################
+    def write_back(self): 
+        # Write-back and clear adders
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_time() == 0:
                 self.registers[rs.get_vj().get_name()].set_buffer(None) # check logic here to make sure registers is freed so it can be used next instruction cycle in issue instruction/execute
                 self.registers[rs.get_vk().get_name()].set_buffer(None)
                 self.registers[rs.get_source().get_name()].set_buffer(None)
+
+                # Clear the Reservation Station
                 rs.get_vk().set_write_back(False)
                 rs.get_vj().set_write_back(False)
                 rs.get_source().set_write_back(False)
@@ -698,11 +938,15 @@ class Tomasulo:
                 rs.set_busy_status(False)
                 rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 rs.set_instruction_pointer(None)
+
+        # Write-back and clear adders       
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_time() == 0:
                 self.registers[rs.get_vj().get_name()].set_buffer(None) 
                 self.registers[rs.get_vk().get_name()].set_buffer(None)
                 self.registers[rs.get_source().get_name()].set_buffer(None)
+
+                # Clear the Reservation Station
                 rs.get_vk().set_write_back(False)
                 rs.get_vj().set_write_back(False)
                 rs.get_source().set_write_back(False)
@@ -717,10 +961,14 @@ class Tomasulo:
                 rs.set_busy_status(False)
                 rs.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 rs.set_instruction_pointer(None)
+
+        # Write-back and Load Buffers
         for lb in self.loadbuffers.values():
             if lb.get_busy_status() == True and lb.get_time() == 0: # lb is only set to false here 
                 self.registers[lb.get_vj().get_name()].set_buffer(None)
                 self.registers[lb.get_source().get_name()].set_buffer(None)
+
+                # Clear the Load Buffer
                 lb.get_vj().set_write_back(False)
                 lb.get_source().set_write_back(False)
                 lb.set_time(None)
@@ -732,39 +980,49 @@ class Tomasulo:
                 lb.set_source_buffer(None)
                 lb.instruction_pointer.set_write_back_cycle(self.clock_cycle)
                 lb.set_instruction_pointer(None)
+                
         self.check_register_buffers()
 
-    def check_register_buffers(self): # helper function used to prevent deadlocks from issued instructions coming before buffers are set
+    ##########################################################
+    # Helper function used to prevent deadlocks from issued
+    # instructions coming before buffers are set
+    ##########################################################
+    def check_register_buffers(self):
+        # Check Adders
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None: # python add is sequential so by checking to make sure not none then the last condition will not result in Nonetype error
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
-                #rs.get_vj().set_write_back(False)
+               
             elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
-                #rs.get_vk().set_write_back(False)
+         
             elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
                 rs.set_source(rs.get_source_buffer())
                 self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
                 rs.set_source_buffer(None)
+                
+        # Check Multipliers        
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True and rs.get_qj() != None and self.registers[rs.get_qj().get_name()].get_buffer() == None:
                 rs.set_vj(rs.get_qj())
                 self.registers[rs.get_qj().get_name()].set_buffer(rs)
                 rs.set_qj(None)
-                #rs.get_vj().set_write_back(False)
+               
             elif rs.get_busy_status() == True and rs.get_qk() != None and self.registers[rs.get_qk().get_name()].get_buffer() == None:
                 rs.set_vk(rs.get_qk())
                 self.registers[rs.get_qk().get_name()].set_buffer(rs)
                 rs.set_qk(None)
-                #rs.get_vk().set_write_back(False)
+               
             elif rs.get_busy_status() == True and rs.get_source_buffer() != None and self.registers[rs.get_source_buffer().get_name()].get_buffer() == None:
                 rs.set_source(rs.get_source_buffer())
                 self.registers[rs.get_source_buffer().get_name()].set_buffer(rs)
                 rs.set_source_buffer(None)
+
+        # Check Load Buffers
         for lb in self.loadbuffers.values():
             """
             if lb.get_busy_status() == True and lb.get_time() == 0:
@@ -785,9 +1043,11 @@ class Tomasulo:
         for rs in self.fp_adders.values():
             if rs.get_busy_status() == True:
                 return False
+            
         for rs in self.fp_multipliers.values():
             if rs.get_busy_status() == True:
                 return False
+            
         for lb in self.loadbuffers.values():
             if lb.get_busy_status() == True:
                 return False
@@ -797,9 +1057,11 @@ class Tomasulo:
         for rs in self.fp_adders.values():
             rs.busy_fraction = rs.busy_cycles/self.clock_cycle
             rs.executing_fraction = rs.executing_cycles/self.clock_cycle
+            
         for rs in self.fp_multipliers.values():
             rs.busy_fraction = rs.busy_cycles/self.clock_cycle
             rs.executing_fraction = rs.executing_cycles/self.clock_cycle
+            
         for lb in self.loadbuffers.values():
             lb.busy_fraction = lb.busy_cycles/self.clock_cycle
             lb.executing_fraction = lb.executing_cycles/self.clock_cycle
@@ -812,28 +1074,27 @@ class Tomasulo:
             instruction = self.instruction_queue.soft_dequeue()
             issued = self.issue_instruction(instruction) # boolean based on if instruction was issued
             if issued == False:
-                while issued == False:
+                while issued == False: 
                     issued = self.issue_instruction(instruction)
                     self.write_back()
                     self.execute_instructions()
-                    #self.write_back()
                     self.increment_clock_cycle()
                     self.update_utilizations()
                     self.display_simulation()
             else:
                 self.write_back()
                 self.execute_instructions()
-                #self.write_back()
                 self.increment_clock_cycle()
                 self.update_utilizations()
                 self.display_simulation()
+                
         while self.empty_reservation_stations() != True: # finish execution after all instructions are issued 
             self.write_back()
             self.execute_instructions()
-            #self.write_back()
             self.increment_clock_cycle()
             self.update_utilizations()
             self.display_simulation()
+            
         print("\nRESULTS TABLE\n")
         print(self.instruction_queue)
 
@@ -851,7 +1112,11 @@ class Tomasulo:
         self.display_registers()
         print("\n")
         
-        
+######################################################
+#
+# Main Program
+#
+######################################################
 
 import matplotlib.pyplot as plt
 import random
